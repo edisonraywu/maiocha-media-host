@@ -1,0 +1,88 @@
+{
+  "campaign_id": "買房喵查局正式開張_2026-09-16",
+  "source_selection_mode": "exact_paths_only",
+  "wildcards_allowed": false,
+  "asset_count": 10,
+  "assets": [
+    {
+      "key": "feed_child_01",
+      "relative_path": "media/maiocha-launch-2026-09-16/feed/01.jpg",
+      "sha256": "DA235C46F20B43C9D44E82CD2101DCFCFFEDBEE7684BC70339D8F676DCA556FD",
+      "file_size": 451245,
+      "content_type": "image/jpeg",
+      "approval_status": "approved"
+    },
+    {
+      "key": "feed_child_02",
+      "relative_path": "media/maiocha-launch-2026-09-16/feed/02.jpg",
+      "sha256": "9174BFDF626A45912FEBE019D2BDA4F1C147897FA881EF1A0EFC794DA74B5036",
+      "file_size": 485668,
+      "content_type": "image/jpeg",
+      "approval_status": "approved"
+    },
+    {
+      "key": "feed_child_03",
+      "relative_path": "media/maiocha-launch-2026-09-16/feed/03-refined.jpg",
+      "sha256": "9FFF49C700727AB1E31D66C94241A6B7016BFFC67350C8C083C1FFB8B04E7FE1",
+      "file_size": 582758,
+      "content_type": "image/jpeg",
+      "approval_status": "approved"
+    },
+    {
+      "key": "feed_child_04",
+      "relative_path": "media/maiocha-launch-2026-09-16/feed/04.jpg",
+      "sha256": "48AB3B73AC1314D6FF80689602E3E08A31545B5AF7092802BA3E6BBD44AF57EC",
+      "file_size": 556292,
+      "content_type": "image/jpeg",
+      "approval_status": "approved"
+    },
+    {
+      "key": "feed_child_05",
+      "relative_path": "media/maiocha-launch-2026-09-16/feed/05-refined.jpg",
+      "sha256": "D3E23122D57589A819C734E76286AB14D0BC9705758D0E4AB05B6E041DF9C964",
+      "file_size": 476325,
+      "content_type": "image/jpeg",
+      "approval_status": "approved"
+    },
+    {
+      "key": "feed_child_06",
+      "relative_path": "media/maiocha-launch-2026-09-16/feed/06.jpg",
+      "sha256": "A70D1F51DFAA18571F78449F6C4ED2A59FEA2307BFFA1DD877E774A48EA56A18",
+      "file_size": 466734,
+      "content_type": "image/jpeg",
+      "approval_status": "approved"
+    },
+    {
+      "key": "reel",
+      "relative_path": "media/maiocha-launch-2026-09-16/reel/reel-24s-7-scenes.mp4",
+      "sha256": "9BB1B364C8A1AB31FA33DE1AB33C09143B51BBDFA926001C7010B2C2DDD047FC",
+      "file_size": 26604722,
+      "content_type": "video/mp4",
+      "approval_status": "approved"
+    },
+    {
+      "key": "story_01",
+      "relative_path": "media/maiocha-launch-2026-09-16/story/01.jpg",
+      "sha256": "7A7D25CF9C3EA8F0F97D00160F1A4FE22680873969443C4C7CC1005754C9A2E0",
+      "file_size": 609138,
+      "content_type": "image/jpeg",
+      "approval_status": "approved"
+    },
+    {
+      "key": "story_02",
+      "relative_path": "media/maiocha-launch-2026-09-16/story/02-refined.jpg",
+      "sha256": "D932BB707749108DED48C89662C576A1E477DB0AC2C0DC744FA08D392AC33B84",
+      "file_size": 540688,
+      "content_type": "image/jpeg",
+      "approval_status": "approved"
+    },
+    {
+      "key": "story_03",
+      "relative_path": "media/maiocha-launch-2026-09-16/story/03.jpg",
+      "sha256": "6CE7E68243E4F70BCEC883DB946F91BE04368E1315683B8CF89699D06965B642",
+      "file_size": 662533,
+      "content_type": "image/jpeg",
+      "approval_status": "approved"
+    }
+  ]
+}
