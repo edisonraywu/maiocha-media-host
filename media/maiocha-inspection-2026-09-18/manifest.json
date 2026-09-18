@@ -1,0 +1,78 @@
+{
+  "campaign_id": "看屋別只看裝潢_2026-09-18",
+  "source_selection_mode": "exact_paths_only",
+  "wildcards_allowed": false,
+  "asset_count": 10,
+  "assets": [
+    {
+      "key": "feed_child_01",
+      "relative_path": "media/maiocha-inspection-2026-09-18/feed/01.jpg",
+      "sha256": "B6FE6945D75A86B4C400F31980235A0019F3411622506DAEDD7BA4955825AECD",
+      "file_size": 379515,
+      "content_type": "image/jpeg"
+    },
+    {
+      "key": "feed_child_02",
+      "relative_path": "media/maiocha-inspection-2026-09-18/feed/02.jpg",
+      "sha256": "630F758435198B374030721B4981D71A10D43627ADE6C37125A24205DFB44C4B",
+      "file_size": 357618,
+      "content_type": "image/jpeg"
+    },
+    {
+      "key": "feed_child_03",
+      "relative_path": "media/maiocha-inspection-2026-09-18/feed/03.jpg",
+      "sha256": "6F531727233886CBAAC4EB5D50C18440EEFA631D0EA93D2F096F2728475E9008",
+      "file_size": 392642,
+      "content_type": "image/jpeg"
+    },
+    {
+      "key": "feed_child_04",
+      "relative_path": "media/maiocha-inspection-2026-09-18/feed/04.jpg",
+      "sha256": "F3E73A59F82C78DC98580A7C183C1A44AD219CD2E51A241736343C952199028D",
+      "file_size": 381279,
+      "content_type": "image/jpeg"
+    },
+    {
+      "key": "feed_child_05",
+      "relative_path": "media/maiocha-inspection-2026-09-18/feed/05.jpg",
+      "sha256": "611FE47CDDBD32A6430ED81565D97B34D6CF9D0B5B6E4E064FDC8582A402C93B",
+      "file_size": 380175,
+      "content_type": "image/jpeg"
+    },
+    {
+      "key": "feed_child_06",
+      "relative_path": "media/maiocha-inspection-2026-09-18/feed/06.jpg",
+      "sha256": "A45C12C89818A15242819945D22C82B0D301328E17B5BF7507AE5C073616F485",
+      "file_size": 394509,
+      "content_type": "image/jpeg"
+    },
+    {
+      "key": "reel",
+      "relative_path": "media/maiocha-inspection-2026-09-18/reel/reel-26s-7-scenes.mp4",
+      "sha256": "989F92F2A376E057169BE3C5E20C0704E04245158D0CCA1ED5923046344EEF08",
+      "file_size": 8572367,
+      "content_type": "video/mp4"
+    },
+    {
+      "key": "story_01",
+      "relative_path": "media/maiocha-inspection-2026-09-18/story/01.jpg",
+      "sha256": "9EB2F229C66BDB83308DB8BCD9762E61C8D6528C113C5B7712AE41724EE5A879",
+      "file_size": 579864,
+      "content_type": "image/jpeg"
+    },
+    {
+      "key": "story_02",
+      "relative_path": "media/maiocha-inspection-2026-09-18/story/02.jpg",
+      "sha256": "ED456C751F13573EB88E21830FC91A13BFFE27612E4B16A12C03E19A2AADC64E",
+      "file_size": 683627,
+      "content_type": "image/jpeg"
+    },
+    {
+      "key": "story_03",
+      "relative_path": "media/maiocha-inspection-2026-09-18/story/03.jpg",
+      "sha256": "DB8E87D35EDD0F5DB0D3E1122D8BFE5B2BA9423F28C9C0943684627F655654AD",
+      "file_size": 507408,
+      "content_type": "image/jpeg"
+    }
+  ]
+}
