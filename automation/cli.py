@@ -92,6 +92,32 @@ def parser():
     choose = sub.add_parser('select-caption')
     choose.add_argument('content_id')
     choose.add_argument('key', choices=['A', 'B', 'C'])
+    calibration = sub.add_parser('calibration')
+    cal = calibration.add_subparsers(dest='calibration_command', required=True)
+    cal.add_parser('status')
+    cin = cal.add_parser('intake')
+    cin.add_argument('--input', type=Path, required=True)
+    cin.add_argument('--source', type=Path, required=True)
+    cin.add_argument('--session-id', required=True)
+    for name in ('prepare', 'preview', 'confirm'):
+        cal.add_parser(name).add_argument('session_id')
+    feedback = cal.add_parser('feedback')
+    feedback.add_argument('session_id')
+    group = feedback.add_mutually_exclusive_group(required=True)
+    group.add_argument('--text')
+    group.add_argument('--input', type=Path)
+    feedback.add_argument('--content-id')
+    feedback.add_argument('--style', choices=list('ABCDEF'))
+    feedback.add_argument('--resolve-pending', action='store_true', help='使用者回答已列出的歧義後才使用')
+    for name in ('update', 'add-photos'):
+        fix = cal.add_parser(name)
+        fix.add_argument('session_id')
+        fix.add_argument('product_ref')
+        if name == 'update':
+            for key in PRODUCT_FIELDS:
+                fix.add_argument('--' + key.replace('_', '-'))
+        else:
+            fix.add_argument('--source', type=Path, required=True)
     return p
 
 
@@ -125,6 +151,46 @@ def run(args):
         if not getattr(args, 'content_id', None):
             raise Blocked('CONTENT_ID_OR_ALL_REQUIRED')
         return [item(args.content_id)]
+    if command == 'calibration':
+        from .calibration import (calibration_status, confirm_style, intake_calibration, prepare_calibration,
+                                  receive_feedback, render_calibration_preview, session_root)
+        action = args.calibration_command
+        if action == 'status':
+            return calibration_status(content)
+        if action == 'intake':
+            from .core import local_lock
+            with local_lock(content):
+                return intake_calibration(content, config, args.input.read_text(encoding='utf-8-sig'), args.source, args.session_id)
+        if action == 'prepare':
+            result = prepare_calibration(content, config, args.session_id, lambda: CodexBatchGenerator(config['generator']['timeout_seconds']))
+            return {'items': [{k: x.get(k) for k in ('content_id', 'status', 'prepare_errors')} for x in result],
+                    'preview': str(render_calibration_preview(content, args.session_id)), 'publication_allowed': False,
+                    'api_post_requests_sent': 0}
+        if action == 'preview':
+            return {'preview': str(render_calibration_preview(content, args.session_id)), 'publication_allowed': False}
+        if action in ('feedback', 'confirm'):
+            from .core import local_lock
+            with local_lock(content), local_lock(session_root(content, args.session_id)):
+                queued = any(read_json(p).get('release_hash') and read_json(p)['status'] not in ('PUBLISHED', 'CANCELLED') for p in item_files(content))
+                store = journal() if queued else None
+                if action == 'feedback':
+                    result = receive_feedback(content, args.session_id, args.text if args.text is not None else args.input.read_text(encoding='utf-8-sig'),
+                            content_id=args.content_id, style_id=args.style, resolve_pending=args.resolve_pending, journal=store)
+                else:
+                    result = confirm_style(content, args.session_id, journal=store)
+            return {'status': result['status'], 'CAPTION_STYLE_CALIBRATED': result['CAPTION_STYLE_CALIBRATED'],
+                    'pending_clarification': result['pending_clarification'], 'publication_allowed': False,
+                    'preview': str(render_calibration_preview(content, args.session_id))}
+        from .batch import add_photos, update_product
+        from .core import PRODUCT_FIELDS, local_lock
+        root = session_root(content, args.session_id)
+        with local_lock(root):
+            if action == 'update':
+                changes = {k: getattr(args, k) for k in PRODUCT_FIELDS if getattr(args, k) is not None}
+                result = update_product(root, config, 'calibration-' + args.session_id, args.product_ref, changes)
+            else:
+                result = add_photos(root, config, 'calibration-' + args.session_id, args.product_ref, args.source)
+        return {'content_id': result['content_id'], 'status': result['status'], 'publication_allowed': False}
     if command == 'doctor':
         missing = [name for name in config['env'].values() if not os.environ.get(name)]
         return {'brand': args.brand, 'target': config['target'], 'missing_env_names': missing,

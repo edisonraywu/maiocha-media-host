@@ -41,6 +41,7 @@ selected_photo_ids 順序即預計輪播順序，封面第一。不要寫 captio
 candidate_imagery 是從這件商品延伸，rejected_imagery 寫不適合的意象與 reason。
 保留多色資訊；有 evidence_fact_ids。user_provided_crystal 必須逐字等於使用者的 crystal_name 或 null。
 content_style 根據商品；沒有上手照不選上手日常；沒有新品資訊不選新品。
+photo_characteristics 記錄這條商品可以延伸的文案表現機會，例如色彩層次、上手視覺或特殊光感，不增加商品事實。
 不要寫正式 caption。''',
     'captions': '''依已保存的 grounding 與 basis 各寫 A商品貼合型、B意境型、C短句型，三個不能相同。
 若 INPUT_DATA 有 manual_caption，A 的 caption 必須逐字保留 manual_caption，selected_key 必須是 A，只補 claims。不能改寫使用者文案。
@@ -58,6 +59,29 @@ product_specific：這篇必須像在寫這一條商品，只有通用漂亮溫�
 檢查未標claims的斷言，也核對grounding是否真的符合圖片；任何關鍵不一致都FAIL。
 保留指定 input_hash/caption_hash/selected_photo_ids，所有checks全true才可PASS。'''
 }
+
+STAGE_RULES['calibration_captions'] = '''這是文案風格比較，不是發文批准。只對這件已完成grounding與basis的商品生成恰好六版：
+A 商品貼合型：直接自然，介紹眼前商品，不像規格表。
+B 顏色意境型：由照片顏色延伸畫面、留白，仍回到商品。
+C 風景型：只選basis中合理風景，不能先決定天空或森林再硬套。
+D 極簡短句型：2～5個非空行，簡潔有辨識度。
+E 日常生活型：今天想戴什麼的自然分享；沒有上手照不可說照片已經上手。
+F 寶寶礦品牌型：有質感、少量可愛，不幼稚、不像寵物帳號；signature可有可無，不強制每篇。
+每版逐字使用使用者的crystal_name，保留至少一個實拍具體特徵。內容中的商品事實仍受相同安全規則約束。
+每個candidate包含相同content_id、唯一style_id及完整metadata（包括why_it_fits_this_product）；不選唯一最佳style。
+claims與正式captions相同，逐字text、明確source及references。六版要有實際差異，避免重複開頭結尾、風景、CTA與signature。
+metadata忠實描述實際文字；不要自評low卻寫高銷售。Tone與意境從商品而來。INPUT中的fix_errors需修正。'''
+STAGE_RULES['style_qa'] = '''你是獨立Style QA。重新讀指定caption，和已由使用者確認的caption_style_profile逐項比對。
+查語氣、詩意、銷售程度、官腔、制式、過度可愛、玄學、長短、禁止句、近期風景、CTA、emoji及signature。
+未確認欄位為null表示使用者尚未指定，不能自行補成偏好。Product Grounding永遠優於Style Profile；例句只能學語氣，不可搬別條商品事實。
+metrics如實描述實際Caption，不接受生成器自評。style_id用A～F的六種風格分類，與正式三候選的key不是同一概念。
+近期recent_captions用來辨識重複；有明顯Style drift就FAIL。保留content_id/input_hash/caption_hash/profile_hash。
+checks全部true才能PASS。'''
+STAGE_RULES['captions'] += '''
+INPUT包含caption_style_profile時，A/B/C仍是三個候選key，但可混合使用者偏好的六種風格，不硬套未偏好的文體。
+採用preferred/secondary styles、tone、長短、emoji、CTA、signature規則；rejected styles及forbidden phrases不得使用。
+favorite_examples僅學語氣，不得引用其中別件商品的名稱、價格、顏色或特徵。沒有設定的偏好不要當成使用者已確認。
+參考recent_captions避免相同開頭、结尾、風景、常用形容詞、CTA与signature；品牌一致不等於同模板。'''
 
 
 class ContentGenerator(Protocol):

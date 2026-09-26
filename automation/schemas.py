@@ -52,3 +52,19 @@ QA_KEYS = ('main_color_matches', 'light_matches', 'transparency_surface_supporte
 VISION_QA = obj(content_id=S, input_hash=S, caption_hash=S, selected_photo_ids=arr(),
                 checks=obj(**{key: B for key in QA_KEYS}), issues=arr(), result=enum('PASS', 'FAIL'))
 SCHEMAS = {'grounding': GROUNDING, 'basis': BASIS, 'captions': CAPTIONS, 'qa': VISION_QA}
+
+LEVEL = enum('low', 'medium', 'high')
+STYLE_META = obj(style_id=enum('A', 'B', 'C', 'D', 'E', 'F'), style_name=S, tone=arr(),
+                 length=enum('short', 'medium', 'long'), poetic_level=LEVEL, imagery_strength=LEVEL,
+                 daily_life_level=LEVEL, sales_level=LEVEL, cta_usage=enum('none', 'present'),
+                 brand_signature_usage=enum('none', 'present'), emoji_usage=enum('none', 'sparse', 'many'),
+                 imagery_used=arr(), why_it_fits_this_product=S)
+CALIBRATION_CANDIDATE = obj(content_id=S, style_id=enum('A', 'B', 'C', 'D', 'E', 'F'), caption=S,
+                           claims=CANDIDATE['properties']['claims'], metadata=STYLE_META)
+SCHEMAS['calibration_captions'] = obj(content_id=S, input_hash=S, candidates=arr(CALIBRATION_CANDIDATE))
+STYLE_QA_KEYS = ('tone_matches', 'poetry_matches', 'sales_matches', 'not_official', 'not_formulaic',
+                 'not_overly_cute', 'not_mystical', 'length_matches', 'phrases_allowed',
+                 'imagery_varied', 'cta_matches', 'signature_matches')
+SCHEMAS['style_qa'] = obj(content_id=S, input_hash=S, caption_hash=S, profile_hash=S,
+                         checks=obj(**{k: B for k in STYLE_QA_KEYS}), metrics=STYLE_META,
+                         issues=arr(), result=enum('PASS', 'FAIL'))

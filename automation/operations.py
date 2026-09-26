@@ -103,7 +103,8 @@ def sync_archive(content: Path, journal):
             archive.mkdir(parents=True, exist_ok=True)
             # Keep input originals immutable, and retain the item as a durable local tombstone.
             for name in ('product_grounding.json', 'caption_basis.json', 'caption_candidates.json',
-                         'caption_qa.json', 'vision_qa.json', 'selected_caption.txt'):
+                         'caption_qa.json', 'vision_qa.json', 'selected_caption.txt', 'style_qa.json',
+                         'style_vision_qa.json', 'style_qa_context.json'):
                 src = path.parent / name
                 if src.exists() and not (archive / name).exists():
                     shutil.copy2(src, archive / name)

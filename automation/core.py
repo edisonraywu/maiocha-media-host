@@ -15,7 +15,8 @@ import yaml
 REPO = Path(__file__).resolve().parents[1]
 BRANDS = frozenset({'baobao', 'maiocha'})
 STATES = frozenset({'DRAFT', 'PREPARED', 'NEEDS_INFO', 'READY', 'READY_FOR_REVIEW', 'APPROVED', 'SCHEDULED', 'PUBLISHING',
-                    'PUBLISHED', 'FAILED', 'MANUAL_ACTION_REQUIRED', 'CANCELLED'})
+                    'PUBLISHED', 'FAILED', 'MANUAL_ACTION_REQUIRED', 'CANCELLED', 'WAITING_FOR_CALIBRATION',
+                    'CALIBRATION_PREPARING', 'CALIBRATION_READY_FOR_REVIEW'})
 PRODUCT_FIELDS = ('product_name', 'crystal_name', 'price', 'bead_size', 'stock', 'sku', 'notes')
 ID_RE = re.compile(r'^[a-zA-Z0-9][a-zA-Z0-9_-]{0,79}$')
 SECRET_RE = re.compile(r'(EAA[A-Za-z0-9]{25,}|github_pat_[A-Za-z0-9_]+|gh[pousr]_[A-Za-z0-9]+|sk-[A-Za-z0-9_-]{20,})')

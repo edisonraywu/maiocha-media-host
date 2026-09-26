@@ -27,6 +27,8 @@ def photo_plan(item: dict, grounding: dict) -> list[dict]:
 
 
 def render_preview(content: Path, config: dict) -> Path:
+    from .style import load_profile
+    style_confirmed = load_profile(content) is not None
     preview = content / 'preview'
     preview.mkdir(parents=True, exist_ok=True)
     rows, cards = [], []
@@ -40,10 +42,14 @@ def render_preview(content: Path, config: dict) -> Path:
         grounding = read_json(folder / 'product_grounding.json', {})
         basis = read_json(folder / 'caption_basis.json', {})
         qa = read_json(folder / 'caption_qa.json', {})
+        style_qa = read_json(folder / 'style_qa.json', {})
         candidates = read_json(folder / 'caption_candidates.json', {})
         review_checks = read_json(folder / 'preview_preflight.json', {})
         caption_path = folder / 'selected_caption.txt'
         caption = caption_path.read_text(encoding='utf-8') if caption_path.exists() else '等待實際商品讀圖與文案生成。'
+        if not style_confirmed and item['status'] != 'PUBLISHED':
+            candidates, qa, style_qa = {}, {}, {}
+            caption = '等待完成第一次文案風格校準；目前僅整理照片與商品觀察。'
         photos = {p['photo_id']: p for p in item.get('photos', [])}
         selection = item.get('selected_photo_ids') or grounding.get('selected_photo_ids', [])
         plan = photo_plan(item, grounding)
@@ -61,7 +67,7 @@ def render_preview(content: Path, config: dict) -> Path:
         title = item['user_provided'].get('product_name') or item['user_provided'].get('crystal_name') or '這條素串（待提供水晶名稱）'
         obs = grounding.get('visual_observations', {})
         rows.append({'content_id': item['content_id'], 'product_name': title, 'publish_at': item.get('publish_at'),
-                     'status': item['status'], 'photos': [photos[k]['source_name'] for k in selection],
+                     'status': item['status'], 'style_qa': style_qa, 'photos': [photos[k]['source_name'] for k in selection],
                      'grounding': obs, 'caption_basis': basis, 'selected_caption': caption,
                      'user_provided': item['user_provided'], 'unknown_fields': grounding.get('unknown_fields', []),
                      'source_folder': item['source_folder'], 'target': config['target'], 'content_type': item.get('content_type'),
@@ -87,7 +93,7 @@ def render_preview(content: Path, config: dict) -> Path:
 <p>候選：{esc('／'.join(basis.get('candidate_imagery', [])))}</p>
 <p>排除：{esc('／'.join(basis.get('rejected_imagery', [])))}</p></section>
 <section><h3>選定文案 {esc(candidates.get('selected_key'))}</h3><pre>{esc(caption)}</pre><p>選擇原因：{esc(candidates.get('selection_reason'))}</p><p>圖片 QA：{esc(qa.get('result'))}</p></section></div>
-<div class="details">{candidate_html}</div>
+<div class="details">{candidate_html}</div><p>Style QA：{esc(style_qa.get('result', '等待風格校準'))} · 風格版本：{esc(style_qa.get('profile_revision'))}</p>
 <p>審核前檢查：{esc(review_checks.get('result', '尚未檢查'))} · Hosting：{esc(review_checks.get('checks', {}).get('hosting', '等待明確批准後公開'))}</p>
 <details><summary>商品資料、未知欄位與需要補充的事項</summary><dl>{metadata}</dl><p>未知：{esc('、'.join(grounding.get('unknown_fields', [])))}</p><pre>{esc(problems or '沒有待補事項')}</pre></details></article>''')
     warning = config['posting'].get('note', '') if config['posting'].get('defaults_need_review') else ''

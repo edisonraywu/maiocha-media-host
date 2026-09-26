@@ -1,4 +1,19 @@
-# 寶寶礦到了｜每週／每兩週的商品批次
+# 寶寶礦到了｜先校準文案，再處理每週商品
+
+## 第一次使用：先做文案風格校準
+
+1. 第一次只給 **1～3 條真實素串**，每條約六張不同角度照片。
+2. 告訴 Codex 每組是什麼水晶、哪些照片屬於同一條。價格、珠徑、SKU、庫存、備註可選填，不必寫 YAML。
+3. Codex 先看照片，整理商品觀察與文案依據，再給每條 **六種 Style** 的私人 Preview。
+4. 直接說喜歡或不喜歡的地方，例如「B 跟 E 喜歡」「C 太文青」「emoji 不要」「品牌句可以留，但不用每篇」。
+5. 系統保存你的回饋，整理風格偏好；你確認後，才建立正式可套用的 Caption Style Profile。仍可隨時說「最近太詩意」來調整。
+6. 完成校準後，才開始下面每週／每兩週的正式 Batch。
+
+**校準只比較文案，不排程、不發布，也不測試發文。確認風格不等於批准商品發布。**尚未校準的正式 Batch 只能先整理照片與 Grounding，停在 `WAITING_FOR_CALIBRATION`。
+
+品牌預設發文時間：**每天上午 10:00，Asia/Taipei**。某篇另訂 19:30 或 20:30 時，只覆蓋那一篇，不改品牌預設。
+
+現在只需要等待第一組校準商品，不需要準備正式 7～14 天內容。可以直接照 [校準收件範例](baobao-caption-calibration.md) 給照片。
 
 系統固定使用 `approval_mode=true`、`auto_publish_without_approval=false`。**提供照片、看 Preview、請我準備或先排好，都不等於批准發布。第一次測試也要你明確同意。**
 
@@ -60,7 +75,7 @@ notes:
 
 `DRAFT → PREPARED → READY_FOR_REVIEW → 停止`
 
-先 ingest、去重與縮圖，逐张分析照片，保存 `product_grounding.json`。再保存 `caption_basis.json`，記錄主／次色、光感、意境選擇與排除理由、手動事實及未知欄位。最後產 A 商品貼合、B 意境、C 短句三版，依商品挑选，獨立重新看圖 QA。
+先 ingest、去重與縮圖，逐張分析照片，保存 `product_grounding.json`。再保存 `caption_basis.json`，記錄主／次色、光感、意境選擇與排除理由、手動事實及未知欄位。已完成風格校準後，產三個候選 A／B／C；這三個是候選代號，會依你的 Style Profile 變化，並非強迫你接受不喜歡的文體。依商品挑選，再獨立重新看圖 QA 與 Style QA。
 
 照片透明感只表示視覺外觀，不是寶石鑑定。主要顏色、光、礦名、價格、珠徑、來源、功效、商品 ID 任一關鍵錯誤，都不能通過。最多再生一次，仍失敗就 `NEEDS_INFO`，並列問題照片與補充建議。
 
@@ -68,7 +83,7 @@ notes:
 
 ## 審核畫面、Hosting 與兩階段 Preflight
 
-Preview 包含商品資料夾、Content ID、預計 target account、照片順序與 photo_id、封面、Grounding、Caption Basis、A／B／C、Selected Caption（含已使用的 hashtags）、形式、狀態和建議日期。
+Preview 包含商品資料夾、Content ID、預計 target account、照片順序與 photo_id、封面、Grounding、Caption Basis、A／B／C、Selected Caption（含已使用的 hashtags）、形式、狀態、建議日期、Style QA 與風格版本。校準 Preview 則保留六種 Style，不選唯一贏家。
 
 - **PREVIEW_PREFLIGHT：**檢查本機商品／文案／照片完整性、命名空間、帳號設定與可用 API。未公開 Hosting 時明示 `PENDING_EXPLICIT_APPROVAL`，不假裝已通過公開 URL 驗證。
 - **PUBLISH_PREFLIGHT：**明確批准後，Hosting 上傳同一 Pages 的 `/media/baobao/{content_id}/`，驗證公開 GET、MIME、SHA256、帳號、token access、批准指紋、schedule、pause、history、防重複，全部通過才可發。
@@ -177,6 +192,7 @@ Preview 包含商品資料夾、Content ID、預計 target account、照片順�
 |---|---|
 | DRAFT / PREPARED | 正在處理照片、觀察與文案 |
 | NEEDS_INFO | 照片或 QA 需要補充 |
+| WAITING_FOR_CALIBRATION | 先完成第一次文案風格回饋與確認 |
 | READY_FOR_REVIEW | 等待你的明確批准 |
 | APPROVED | 已批准，尚未正式排程 |
 | SCHEDULED | 完整線上 Preflight 通過、已登記 queue |
@@ -222,9 +238,9 @@ GitHub PAT 權限目前已修正，可部署 workflows、操作 Actions 和 Secr
 
 ## 第一篇真實測試
 
-本次 Batch 工程驗收不要求現在提供照片，也不做任何 Instagram POST。首次實物文案品質與測試發布會在未來收到真實照片後進行；fixture 測試不冒充實物驗收。
+本次校準工程驗收不要求正式 Batch，也不做任何 Instagram POST。先用未來 1～3 條真實商品完成文案風格校準；fixture 測試不冒充實物品質驗收。
 
-GitHub、Meta 都完成後，提供一條真實商品照片；資料夾預設 `inbox/2026-10-001/`。Prepare 後先停在 READY_FOR_REVIEW，讓你看真實 Preview。
+風格校準完成後，若你希望拿某條校準商品正式測試發文，Codex 會依你的明確指定建立正式商品項目，重新做 Product QA／Style QA 與正式 Preview。校準項目的 ID 永遠不能拿來發布。正式項目停在 READY_FOR_REVIEW，等待你另外批准。
 
 **等你說「這篇可以測試發」才繼續。**首次只測一篇單張 Feed；多張商品照可先完成輪播預覽，再經你審核選定的測試封面，不批次發。
 

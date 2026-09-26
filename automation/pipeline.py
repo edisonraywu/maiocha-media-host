@@ -10,6 +10,52 @@ from .qa import grounding_errors, qa_report, validate
 PROVENANCE = ('brand', 'source_folder', 'user_provided', 'unknown_fields', 'user_declared_facts')
 
 
+def observe_product(content: Path, item: dict, config: dict, generator, *, with_basis=True):
+    """Shared actual-photo grounding/basis; no caption selection, approval or publication."""
+    assert_current(content, item)
+    folder = item_dir(content, item['content_id'])
+    base = {'content_id': item['content_id'], 'input_hash': item['input_hash'],
+            'user_provided': item['user_provided'], 'brand_voice': config['brand_voice'],
+            'photo_ids': [p['photo_id'] for p in item['photos']],
+            'technical_diagnostics': [{k: p[k] for k in ('photo_id', 'original_width', 'original_height', 'technical_warning')} for p in item['photos']]}
+    images = [inside(folder, p['processed_path']) for p in item['photos']]
+    grounding = read_json(folder / 'product_grounding.json')
+    if not grounding or grounding.get('input_hash') != item['input_hash'] or grounding.get('user_provided') != item['user_provided']:
+        grounding = generator.generate('grounding', base, images, folder / 'generation' / 'observation')
+    model = {k: v for k, v in grounding.items() if k not in PROVENANCE}
+    errors = grounding_errors(model, item)
+    grounding.update(brand=item['brand'], source_folder=item['source_folder'], user_provided=item['user_provided'],
+                     user_declared_facts=dict(item['user_provided'], **item.get('declared_schedule', {})),
+                     unknown_fields=[f for f in PRODUCT_FIELDS if item['user_provided'].get(f) is None])
+    save_json(folder / 'product_grounding.json', grounding)
+    item['photo_issues'] = grounding['issues']
+    if errors:
+        raise Blocked(errors[0])
+    if not str(item['user_provided'].get('crystal_name') or '').strip():
+        raise Blocked('USER_CRYSTAL_NAME_REQUIRED')
+    basis = None
+    if with_basis:
+        basis = read_json(folder / 'caption_basis.json')
+        if not basis or basis.get('input_hash') != item['input_hash']:
+            basis = generator.generate('basis', {**base, 'grounding': grounding}, images, folder / 'generation' / 'basis')
+        validate('basis', basis, item)
+        if basis['user_provided_crystal'] != item['user_provided']['crystal_name']:
+            raise Blocked('BASIS_CRYSTAL_MISMATCH')
+        basis['user_provided_facts'] = [{'field': k, 'value': str(v)} for k, v in grounding['user_declared_facts'].items() if v is not None]
+        basis['unknown_facts'] = list(grounding['unknown_fields'])
+        save_json(folder / 'caption_basis.json', basis)
+    return base, images, grounding, basis
+
+
+def include_style_report(report: dict, style: dict) -> dict:
+    report['style_qa_hash'] = digest(style)
+    report['style_profile_hash'] = style['profile_hash']
+    if style['result'] != 'PASS':
+        report['result'] = 'FAIL'
+        report['errors'] = sorted(set(report['errors'] + style['errors']))
+    return report
+
+
 def assert_current(content: Path, item: dict) -> None:
     source = inside(content, item['source_folder'])
     if source.exists():
@@ -32,6 +78,8 @@ def prepare_one(content: Path, item: dict, config: dict, generator, recent: list
     folder = item_dir(content, item['content_id'])
     if item['status'] in ('PUBLISHED', 'PUBLISHING', 'MANUAL_ACTION_REQUIRED', 'CANCELLED'):
         return item
+    if item.get('purpose') == 'calibration' or item['content_id'].startswith('baobao-calibration-'):
+        raise Blocked('USE_CALIBRATION_PREPARE')
     if item.get('issues'):
         item['status'] = 'NEEDS_INFO'
         save_json(folder / 'item.json', item)
@@ -47,36 +95,19 @@ def prepare_one(content: Path, item: dict, config: dict, generator, recent: list
     except Blocked:
         item.pop('approval', None)
         item['status'] = 'DRAFT'
-    base = {'content_id': item['content_id'], 'input_hash': item['input_hash'],
-            'user_provided': item['user_provided'], 'brand_voice': config['brand_voice'],
-            'photo_ids': [p['photo_id'] for p in item['photos']],
-            'technical_diagnostics': [{k: p[k] for k in ('photo_id', 'original_width', 'original_height', 'technical_warning')} for p in item['photos']]}
-    images = [inside(folder, p['processed_path']) for p in item['photos']]
     work = folder / 'generation'
     try:
-        grounding = generator.generate('grounding', base, images, work / 'observation')
-        errors = grounding_errors(grounding, item)
-        # User metadata and provenance are inserted by code, never accepted from AI.
-        grounding.update({'brand': item['brand'], 'source_folder': item['source_folder'],
-                          'user_provided': item['user_provided'],
-                          'user_declared_facts': dict(item['user_provided'], **item.get('declared_schedule', {})),
-                          'unknown_fields': [f for f in PRODUCT_FIELDS if item['user_provided'].get(f) is None]})
-        save_json(folder / 'product_grounding.json', grounding)
-        if not str(item['user_provided'].get('crystal_name') or '').strip():
-            errors.append('USER_CRYSTAL_NAME_REQUIRED')
-        if errors:
-            item['status'], item['prepare_errors'] = 'NEEDS_INFO', errors
-            item['photo_issues'] = grounding['issues']
+        from .style import load_profile, recent_captions, run_style_qa
+        profile = load_profile(content)
+        base, images, grounding, basis = observe_product(content, item, config, generator, with_basis=bool(profile))
+        if not profile:
+            item.update(status='WAITING_FOR_CALIBRATION', approval=None, approval_state='PENDING',
+                        prepare_errors=['CAPTION_STYLE_CALIBRATION_REQUIRED'])
             save_json(folder / 'item.json', item)
             return item
-        # Strict schema QA validates the original model view without the provenance fields added above.
+        base['caption_style_profile'] = profile
+        base['recent_captions'] = recent_captions(content, exclude_id=item['content_id'])
         model_grounding = {k: v for k, v in grounding.items() if k not in PROVENANCE}
-        basis = generator.generate('basis', {**base, 'grounding': grounding}, images, work / 'basis')
-        validate('basis', basis, item)
-        basis['user_provided_facts'] = [{'field': k, 'value': str(v)} for k, v in item['user_provided'].items() if v is not None]
-        basis['user_provided_facts'] += [{'field': k, 'value': str(v)} for k, v in item.get('declared_schedule', {}).items() if v is not None]
-        basis['unknown_facts'] = list(grounding['unknown_fields'])
-        save_json(folder / 'caption_basis.json', basis)
         item.update(status='PREPARED', approval=None, approval_state='PENDING')
         save_json(folder / 'item.json', item)
         previous_errors = []
@@ -92,6 +123,8 @@ def prepare_one(content: Path, item: dict, config: dict, generator, recent: list
                               'caption': selected['caption'], 'caption_hash': text_hash(selected['caption']),
                               'selected_photo_ids': grounding['selected_photo_ids']}, images, work / f'qa-{attempt}')
             report = qa_report(item, model_grounding, basis, captions, vision)
+            style = run_style_qa(content, item, selected['caption'], dict(base, grounding=grounding, caption_basis=basis), images, generator, work / f'style-qa-{attempt}')
+            include_style_report(report, style)
             # Match the saved provenance-inclusive report, not only the model's own subset.
             report['grounding_hash'] = digest(grounding)
             save_json(folder / f'caption_candidates.attempt-{attempt + 1}.json', captions)
@@ -125,6 +158,8 @@ def prepare_one(content: Path, item: dict, config: dict, generator, recent: list
 
 
 def check_prepared(content: Path, item: dict) -> dict:
+    from .style import require_formal_item, check_style_prepared
+    require_formal_item(content, item)
     if not str(item['user_provided'].get('crystal_name') or '').strip():
         raise Blocked('USER_CRYSTAL_NAME_REQUIRED')
     if item.get('batch_id'):
@@ -143,6 +178,12 @@ def check_prepared(content: Path, item: dict) -> dict:
         raise Blocked('GROUNDING_PRODUCT_MISMATCH')
     subset = {k: v for k, v in grounding.items() if k not in PROVENANCE}
     rerun = qa_report(item, subset, basis, captions, vision)
+    caption = (folder / 'selected_caption.txt').read_text(encoding='utf-8')
+    # Check the original caption hash before Style QA to retain precise stale-edit diagnostics.
+    from .core import text_hash
+    if text_hash(caption) != report['caption_hash']:
+        raise Blocked('CAPTION_CHANGED_REQUIRES_IMAGE_QA')
+    include_style_report(rerun, check_style_prepared(content, item, caption))
     rerun['grounding_hash'] = digest(grounding)
     if rerun != report or report['result'] != 'PASS' or digest(report) != item.get('qa_hash'):
         raise Blocked('CAPTION_QA_FAILED_OR_STALE')
@@ -160,7 +201,7 @@ def prepare(content: Path, config: dict, generator_factory) -> list[dict]:
         recent = []
         results = []
         for item in all_items:
-            needs_work = item['status'] in ('DRAFT', 'PREPARED', 'NEEDS_INFO') and not item.get('issues')
+            needs_work = item['status'] in ('DRAFT', 'PREPARED', 'NEEDS_INFO', 'WAITING_FOR_CALIBRATION') and not item.get('issues')
             if item['status'] in ('READY', 'READY_FOR_REVIEW', 'APPROVED', 'SCHEDULED'):
                 try:
                     check_prepared(content, item)
@@ -187,6 +228,8 @@ def prepare(content: Path, config: dict, generator_factory) -> list[dict]:
 
 
 def review_caption(content: Path, item: dict, config: dict, generator):
+    from .style import require_formal_item, run_style_qa
+    profile = require_formal_item(content, item)
     if item['status'] in ('PUBLISHED', 'PUBLISHING', 'MANUAL_ACTION_REQUIRED'):
         raise Blocked('IMMUTABLE_OR_UNCERTAIN_PRODUCT')
     assert_current(content, item)
@@ -198,6 +241,7 @@ def review_caption(content: Path, item: dict, config: dict, generator):
     base = {'content_id': item['content_id'], 'input_hash': item['input_hash'], 'user_provided': item['user_provided'],
             'photo_ids': [p['photo_id'] for p in item['photos']], 'grounding': grounding,
             'caption_basis': basis, 'manual_caption': manual, 'brand_voice': config['brand_voice']}
+    base['caption_style_profile'] = profile
     item['approval'] = None
     item['approval_state'] = 'PENDING'
     item['status'] = 'NEEDS_INFO'
@@ -212,6 +256,7 @@ def review_caption(content: Path, item: dict, config: dict, generator):
                                 selected_photo_ids=grounding['selected_photo_ids']), images, folder / 'generation' / 'manual-qa')
     subset = {k: v for k, v in grounding.items() if k not in PROVENANCE}
     report = qa_report(item, subset, basis, captions, vision)
+    include_style_report(report, run_style_qa(content, item, manual, base, images, generator, folder / 'generation' / 'manual-style-qa'))
     report['grounding_hash'] = digest(grounding)
     save_json(folder / 'caption_candidates.json', captions)
     save_json(folder / 'vision_qa.json', vision)
@@ -226,6 +271,8 @@ def review_caption(content: Path, item: dict, config: dict, generator):
 def revise_one(content: Path, item: dict, config: dict, generator, *, instructions: str = '', photo_ids: list[str] | None = None,
                selected_key: str | None = None):
     """Revise only this item; keep its original grounding/basis and every other product untouched."""
+    from .style import require_formal_item, run_style_qa
+    profile = require_formal_item(content, item)
     if item['status'] in ('PUBLISHED', 'PUBLISHING', 'MANUAL_ACTION_REQUIRED', 'CANCELLED'):
         raise Blocked('IMMUTABLE_OR_UNCERTAIN_PRODUCT')
     assert_current(content, item)
@@ -252,6 +299,7 @@ def revise_one(content: Path, item: dict, config: dict, generator, *, instructio
     base = {'content_id': item['content_id'], 'input_hash': item['input_hash'], 'user_provided': item['user_provided'],
             'photo_ids': [p['photo_id'] for p in item['photos']], 'grounding': grounding,
             'caption_basis': basis, 'brand_voice': config['brand_voice'], 'user_revision_request': instructions}
+    base['caption_style_profile'] = profile
     subset = {k: v for k, v in grounding.items() if k not in PROVENANCE}
     previous_errors = []
     try:
@@ -269,6 +317,7 @@ def revise_one(content: Path, item: dict, config: dict, generator, *, instructio
             vision = generator.generate('qa', dict(base, caption=chosen['caption'], caption_hash=text_hash(chosen['caption']),
                                         selected_photo_ids=grounding['selected_photo_ids']), images, folder / 'generation' / f'revision-qa-{attempt}')
             report = qa_report(item, subset, basis, captions, vision)
+            include_style_report(report, run_style_qa(content, item, chosen['caption'], base, images, generator, folder / 'generation' / f'revision-style-qa-{attempt}'))
             report['grounding_hash'] = digest(grounding)
             save_json(folder / 'caption_candidates.json', captions)
             save_json(folder / 'vision_qa.json', vision)

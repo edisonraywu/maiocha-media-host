@@ -19,6 +19,8 @@ def approval_fingerprint(item: dict, config: dict):
 
 
 def approve(content: Path, item: dict, config: dict):
+    from .style import require_formal_item
+    require_formal_item(content, item)
     if item['status'] not in ('READY_FOR_REVIEW', 'APPROVED', 'SCHEDULED'):
         raise Blocked('ITEM_NOT_READY')
     check_prepared(content, item)
@@ -64,16 +66,19 @@ def build_release(content: Path, item: dict, config: dict) -> dict:
                        'mime': 'image/jpeg', 'width': 1080, 'height': 1350,
                        'url': config['hosting']['base_url'].rstrip('/') + '/' + public_path})
     caption = (folder / 'selected_caption.txt').read_text(encoding='utf-8')
-    release = {'schema_version': 3, 'brand': item['brand'], 'content_id': item['content_id'],
+    style = read_json(folder / 'style_qa.json')
+    release = {'schema_version': 3, 'brand': item['brand'], 'purpose': 'formal', 'content_id': item['content_id'],
                'input_hash': item['input_hash'], 'target': config['target'], 'api_version': config['api_version'],
                'content_type': item['content_type'], 'publish_at': item['publish_at'],
                'namespace': config['hosting']['namespace'], 'assets': assets,
                'caption_path': f'releases/{item["brand"]}/{item["content_id"]}/caption.txt',
                'caption_sha256': text_hash(caption), 'source_asset_hashes': [photos[k]['source_sha256'] for k in item['selected_photo_ids']],
                'qa': {'result': 'PASS', 'brand': item['brand'], 'content_id': item['content_id'],
+                      'style_report_hash': report['style_qa_hash'], 'style_profile_hash': report['style_profile_hash'],
                       'input_hash': item['input_hash'], 'caption_hash': report['caption_hash'],
                       'checks': report['checks'], 'local_report_hash': digest(report),
                       'selected_photo_ids': item['selected_photo_ids']},
+               'style_qa': style, 'caption_style_calibrated': True,
                'approval': approval, 'approval_state': 'APPROVED', 'status': 'APPROVED'}
     release['release_hash'] = digest(release)
     secret_free(release)
@@ -102,6 +107,10 @@ def stage_release(repo: Path, content: Path, item: dict, config: dict):
 
 def require_approved_release(release: dict):
     """Fail before any network call, including explicit test publication."""
+    if release.get('purpose') != 'formal' or str(release.get('content_id', '')).startswith('baobao-calibration-'):
+        raise Blocked('CALIBRATION_CANNOT_PUBLISH_OR_SCHEDULE')
+    if release.get('caption_style_calibrated') is not True:
+        raise Blocked('CAPTION_STYLE_CALIBRATION_REQUIRED')
     approval = release.get('approval') or {}
     if (release.get('status') not in ('APPROVED', 'SCHEDULED') or release.get('approval_state') != 'APPROVED' or
             approval.get('mode') != 'manual' or approval.get('state') != 'APPROVED' or
@@ -135,6 +144,15 @@ def validate_release(repo: Path, release: dict, config: dict):
     if len(release.get('source_asset_hashes', [])) != count or len(set(a.get('photo_id') for a in release['assets'])) != count:
         raise Blocked('INVALID_SOURCE_ASSET_BINDING')
     qa = release.get('qa', {})
+    style = release.get('style_qa', {})
+    from .schemas import STYLE_QA_KEYS
+    if (style.get('result') != 'PASS' or style.get('errors') or style.get('brand') != brand or
+        style.get('content_id') != cid or style.get('input_hash') != release.get('input_hash') or
+        style.get('caption_hash') != release.get('caption_sha256') or
+        not style.get('profile_hash') or style.get('profile_hash') != qa.get('style_profile_hash') or
+        digest(style) != qa.get('style_report_hash') or
+        set(style.get('checks', {})) != set(STYLE_QA_KEYS) or any(v is not True for v in style['checks'].values())):
+        raise Blocked('STYLE_QA_NOT_VALID')
     if (qa.get('result') != 'PASS' or qa.get('brand') != brand or qa.get('content_id') != cid or
         qa.get('input_hash') != release.get('input_hash') or qa.get('caption_hash') != release.get('caption_sha256') or
         set(qa.get('checks', {})) != set(QA_KEYS) or any(v is not True for v in qa['checks'].values()) or

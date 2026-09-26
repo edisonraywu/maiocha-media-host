@@ -40,7 +40,7 @@ def parsed_date(match, year: int) -> date:
         raise Blocked('INVALID_PUBLISH_DATE') from None
 
 
-def parse_intake(text: str, config: dict, *, year: int | None = None) -> dict:
+def parse_intake(text: str, config: dict, *, year: int | None = None, require_dates=True) -> dict:
     """Accept owner's short lists or multiline product blocks. Ambiguities stay local.
 
     Codex can normalize more conversational phrasing into this same explicit list;
@@ -107,7 +107,7 @@ def parse_intake(text: str, config: dict, *, year: int | None = None) -> dict:
                 issues.append(error.code)
         elif len(dates) > 1:
             issues.append('AMBIGUOUS_PUBLISH_DATE')
-        else:
+        elif require_dates:
             issues.append('USER_PUBLISH_DATE_REQUIRED')
         times = re.findall(r'(?<!\d)(\d{1,2}:[0-5]\d)(?!\d)', remainder)
         publish_time = clock
@@ -167,15 +167,26 @@ def write_binding(folder: Path, manifest: dict, product: dict):
     provided = {k: product.get(k) for k in PRODUCT_FIELDS}
     atomic_bytes(folder / 'product.yaml', yaml.safe_dump(provided, allow_unicode=True, sort_keys=False).encode('utf-8'))
     save_json(folder / 'batch-binding.json', {'brand': manifest['brand'], 'batch_id': manifest['batch_id'],
+              'purpose': manifest.get('purpose', 'formal'),
               'content_id': product['content_id'], 'product_ref': product['product_ref'],
               'metadata_hash': digest(provided), 'declared_schedule': declared_schedule(product),
               'source_images': [{k: a[k] for k in ('file', 'sha256')} for a in product['source_images']]})
 
 
-def intake_batch(content: Path, config: dict, text: str, source: Path, *, batch_id: str | None = None, year: int | None = None) -> dict:
-    parsed = parse_intake(text, config, year=year)
+def intake_batch(content: Path, config: dict, text: str, source: Path, *, batch_id: str | None = None, year: int | None = None, purpose='formal') -> dict:
+    if purpose not in ('formal', 'calibration'):
+        raise Blocked('INVALID_INTAKE_PURPOSE')
+    parsed = parse_intake(text, config, year=year, require_dates=purpose == 'formal')
+    if purpose == 'calibration':
+        if not 1 <= len(parsed['products']) <= 3:
+            raise Blocked('CALIBRATION_REQUIRES_ONE_TO_THREE_PRODUCTS')
+        parsed['date_range'] = {'start': None, 'end': None}
+        for product in parsed['products']:
+            product.update(publish_date=None, publish_time=None, publish_at=None, time_source='calibration_no_schedule')
     dates = parsed['date_range']
     batch_id = valid_id(batch_id or f'{dates["start"] or "undated"}_to_{dates["end"] or "undated"}')
+    if batch_id.startswith('calibration-') != (purpose == 'calibration'):
+        raise Blocked('RESERVED_CALIBRATION_NAMESPACE')
     folder = batch_path(content, batch_id)
     source = source.resolve()
     if not source.is_dir() or source == folder.resolve() or source.is_relative_to(folder.resolve()):
@@ -185,7 +196,7 @@ def intake_batch(content: Path, config: dict, text: str, source: Path, *, batch_
         if old['intake_hash'] != digest({'text': text, 'source': str(source), 'parsed': parsed}):
             raise Blocked('BATCH_EXISTS_USE_TARGETED_UPDATE')
         return refresh_batch(content, batch_id)
-    manifest = dict(parsed, schema_version=1, batch_id=batch_id, brand=config['brand'], created_at=now(),
+    manifest = dict(parsed, schema_version=1, batch_id=batch_id, brand=config['brand'], purpose=purpose, created_at=now(),
                     intake_hash=digest({'text': text, 'source': str(source), 'parsed': parsed}),
                     source_directory=str(source), status='DRAFT', approval_granted=False)
     for product in manifest['products']:
@@ -274,7 +285,7 @@ def assert_batch_binding(content: Path, item: dict):
         return
     manifest = refresh_batch(content, item['batch_id'])
     product = next((p for p in manifest['products'] if p['content_id'] == item['content_id']), None)
-    if (not product or item['brand'] != manifest['brand'] or item['user_provided'] != {k: product[k] for k in PRODUCT_FIELDS}
+    if (not product or item.get('purpose', 'formal') != manifest.get('purpose', 'formal') or item['brand'] != manifest['brand'] or item['user_provided'] != {k: product[k] for k in PRODUCT_FIELDS}
             or item.get('declared_schedule') != declared_schedule(product) or item.get('publish_at') != product.get('publish_at')):
         raise Blocked('BATCH_PRODUCT_BINDING_MISMATCH')
     if product.get('binding_errors'):
@@ -384,6 +395,9 @@ def update_product(content: Path, config: dict, batch_id: str, product_ref: str,
     manifest = read_json(folder / 'batch.json')
     if not manifest:
         raise Blocked('BATCH_NOT_FOUND')
+    calibration = manifest.get('purpose') == 'calibration'
+    if calibration and set(changes) & {'publish_date', 'publish_time'}:
+        raise Blocked('CALIBRATION_CANNOT_PUBLISH_OR_SCHEDULE')
     product = next((p for p in manifest['products'] if p['product_ref'] == product_ref), None)
     if not product:
         raise Blocked('PRODUCT_REFERENCE_NOT_FOUND')
@@ -396,7 +410,9 @@ def update_product(content: Path, config: dict, batch_id: str, product_ref: str,
     # Validate through the same parser; every changed value remains explicitly owner supplied.
     lines = [product_ref, updated.get('publish_date') or '', updated.get('publish_time') or default_time(config)]
     lines += [f'{key}: {updated[key]}' for key in PRODUCT_FIELDS if updated.get(key) is not None]
-    parsed = parse_intake('\n'.join(lines), config)['products'][0]
+    parsed = parse_intake('\n'.join(lines), config, require_dates=not calibration)['products'][0]
+    if calibration:
+        parsed.update(publish_date=None, publish_time=None, publish_at=None, time_source='calibration_no_schedule')
     product.update({k: parsed[k] for k in (*PRODUCT_FIELDS, 'publish_date', 'publish_time', 'publish_at', 'time_source', 'issues')})
     product['user_declaration'] += '\n明確修改：' + str(changes)
     write_binding(folder / product_ref, manifest, product)

@@ -1,18 +1,20 @@
 # 寶寶礦到了｜Batch 工程驗收
 
+> 進行中的延伸：每日10:00 Asia/Taipei已保存。Caption Calibration 本機131項回歸、maiocha8項／40檔不變、3商品×6照片×6Style的HTML／JSON驗證已PASS；本次程式更新部署後接續雲端CI與唯讀帳號Dry Run，再更新本報告。下一步是等待1～3條校準商品，不要求正式Batch。風格尚未選定，production仍paused，Instagram POST=0。以下保留先前PART A驗收依據。
+
 驗收日期：2026-09-26（Asia/Taipei）。本次依最新要求，以「所有收件工程準備完成，只等未來一週／兩週商品」為終點，不要求現在提供照片或測試發布。
 
-`READY_FOR_BATCH_PHOTO_WORKFLOW = NO`
+`READY_FOR_BATCH_PHOTO_WORKFLOW = YES`
 
-`WAITING_FOR_BATCH_PHOTOS = NO`
+`WAITING_FOR_BATCH_PHOTOS = YES`
 
-目前 checkpoint：DEFAULT_PUBLISH_TIME_OWNER_CONFIRMATION。每日預設時間：待使用者回覆一次性時間問題；未把20:00樣板當成批准。
+目前 checkpoint：WAITING_FOR_BATCH_PHOTOS。每日預設時間：10:00。
 
 | 驗收項目 | 結果與證據 |
 |---|---|
-| A. GitHub | PASS，本次程式已部署；基準 5a2748207dfda8d052143c73363f5b47bd063d12；未回滾 commits |
-| B. Actions / CI | https://github.com/edisonraywu/maiocha-media-host/actions/runs/36238952629 |
-| C. Pages | https://github.com/edisonraywu/maiocha-media-host/actions/runs/36238952389；沿用 maiocha-media-host |
+| A. GitHub | PASS，本次程式已部署；基準 8e4ced9a72d40a3afdfc629f0cefee91448c9eed；未回滾 commits |
+| B. Actions / CI | https://github.com/edisonraywu/maiocha-media-host/actions/runs/36239856533 |
+| C. Pages | https://github.com/edisonraywu/maiocha-media-host/actions/runs/36239855856；沿用 maiocha-media-host |
 | D. Meta authorization | PASS；沿用 MaiOcha Lab Automation / 1833218008099793、Facebook Login、v26.0 |
 | E. Secrets | PASS；BAOBAO_PAGE_ID、BAOBAO_IG_USER_ID、BAOBAO_IG_USERNAME、BAOBAO_PAGE_ACCESS_TOKEN 已存在；只驗證存在，不輸出值 |
 | F. Account Verification | PASS；日常收藏所 / Page 1348149615047101 → IG 17841431857348052 → babycrystal.tw；真實 API 關聯與專用帳號核對 |
@@ -29,7 +31,7 @@
 | Q. Publisher / Approval | PASS（mock integration）；未批准在最上層拒絕；批准指紋綁定文案／照片／日期；publish無生成器呼叫；batch prepare無批准／queue／POST |
 | R. Hosting / Preflight | 共用 Pages 與 /media/baobao/{content_id}/，已測 URL/MIME/hash failure gate；公開商品需明確批准後才上傳，未使用fixture冒充實物Hosting |
 | S. Pause / Duplicate | PASS；journal pause及環境pause均攔截；成功記Media ID與hash，禁止自動重發；目前真實journal paused=true、production_ready=false、queue=0、items=0 |
-| T. baobao Tests | 95 項本機測試 PASS；隔離fixtures／fake Meta，沒有真實商品發布 |
+| T. baobao Tests | 96 項本機測試 PASS；隔離fixtures／fake Meta，沒有真實商品發布 |
 | U. maiocha Regression | 8 項原有測試 PASS；40個原檔0變更；沒有改maiocha帳號、素材或workflow |
 | V. Cloud Dry Run | https://github.com/edisonraywu/maiocha-media-host/actions/runs/36238971349；專用 Secrets、live account、pause 只讀驗證，Instagram POST=0 |
 
@@ -47,6 +49,6 @@
 
 ## 剩餘一次性操作
 
-DEFAULT_PUBLISH_TIME_OWNER_CONFIRMATION
+無工程設定待使用者處理；下一件事是未來提供真實商品批次。
 
 舊的完整實物上線標準仍為 `READY_FOR_PHOTO_ONLY_WORKFLOW = NO` / `READY_FOR_BAOBAO_AUTOMATION = NO`，直到真實商品經審核、明確批准並完成一篇test publish。新的 Batch readiness 只描述照片到待審核的工程已備妥，不授權任何自動發文。

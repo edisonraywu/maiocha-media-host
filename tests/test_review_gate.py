@@ -106,7 +106,7 @@ class ReviewGateTests(unittest.TestCase):
         self.assertEqual(result['status'], 'READY_FOR_REVIEW')
         self.assertEqual(file_hash(other), prior)
         self.assertEqual(file_hash(folder / 'product_grounding.json'), grounding)
-        self.assertTrue(all(stage in ('captions', 'qa') and cid == one['content_id'] for stage, cid, _ in generator.calls))
+        self.assertTrue(all(stage in ('captions', 'qa', 'style_qa') and cid == one['content_id'] for stage, cid, _ in generator.calls))
         self.assertIsNone(result['approval'])
 
     def test_reorder_keeps_caption_and_requires_fresh_review(self):
@@ -119,7 +119,7 @@ class ReviewGateTests(unittest.TestCase):
         self.assertEqual(result['status'], 'READY_FOR_REVIEW')
         self.assertEqual(result['selected_photo_ids'], order)
         self.assertEqual(file_hash(folder / 'selected_caption.txt'), caption)
-        self.assertEqual([stage for stage, _, _ in generator.calls], ['qa'])
+        self.assertEqual([stage for stage, _, _ in generator.calls], ['qa', 'style_qa'])
         self.assertEqual(check_prepared(self.content, result)['result'], 'PASS')
         with self.assertRaisesRegex(Blocked, 'EXPLICIT_APPROVAL_REQUIRED'):
             build_release(self.content, result, self.config)

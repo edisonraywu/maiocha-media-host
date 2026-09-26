@@ -24,6 +24,25 @@ from automation.release import approve, build_release, stage_release, validate_r
 from automation.schemas import QA_KEYS
 
 
+def confirmed_fixture_profile(content):
+    """Explicit synthetic owner feedback for existing pipeline regression tests only."""
+    from automation.style import empty_profile, save_profile
+    profile = empty_profile()
+    profile.update(revision=1, status='CALIBRATION_STYLE_CONFIRMED', CAPTION_STYLE_CALIBRATED='YES',
+                   feedback=[{'source': 'explicit_owner_style_feedback', 'text': 'FIXTURE ONLY: accept controlled synthetic examples'}])
+    profile['confirmation'] = {'source': 'explicit_style_confirmation', 'feedback_hash': digest(profile['feedback'])}
+    # Existing batch fixtures deliberately repeat text to test binding, not writing quality.
+    profile['recent_repetition_rules'] = {k: (1.1 if k == 'max_similarity' else 99) for k in profile['recent_repetition_rules']}
+    return save_profile(content, profile)
+
+
+def fixture_style_metadata(style='A'):
+    from automation.style import STYLE_NAMES
+    return dict(style_id=style, style_name=STYLE_NAMES[style], tone=['自然'], length='short', poetic_level='low',
+                imagery_strength='medium', daily_life_level='medium', sales_level='low', cta_usage='none',
+                brand_signature_usage='none', emoji_usage='none', imagery_used=[], why_it_fits_this_product='實際藍白相間與側光。')
+
+
 class FixtureGenerator:
     def __init__(self, wrong_colour=False, wrong_product=False, bad_qa=False, unusable=False):
         self.calls = []
@@ -74,6 +93,10 @@ class FixtureGenerator:
                 checks['product_specific'] = False
             return dict(base, caption_hash=payload['caption_hash'], selected_photo_ids=payload['selected_photo_ids'],
                         checks=checks, issues=[], result='FAIL' if self.bad_qa else 'PASS')
+        if stage == 'style_qa':
+            from automation.schemas import STYLE_QA_KEYS
+            return dict(base, caption_hash=payload['caption_hash'], profile_hash=payload['profile_hash'],
+                        checks={key: True for key in STYLE_QA_KEYS}, metrics=fixture_style_metadata(), issues=[], result='PASS')
         raise AssertionError(stage)
 
 
@@ -128,6 +151,7 @@ class PipelineTests(unittest.TestCase):
         self.repo.mkdir()
         self.content = self.root / 'content' / 'baobao'
         self.content.mkdir(parents=True)
+        confirmed_fixture_profile(self.content)
         self.config = brand_config('baobao')
         self.config['target'] = {'instagram_user_id': '222', 'facebook_page_id': '333', 'username': 'fixture.baobao'}
         self.config['posting']['defaults_need_review'] = False

@@ -179,7 +179,7 @@ class BatchTests(unittest.TestCase):
         self.assertEqual(updated['status'], 'READY_FOR_REVIEW')
         self.assertEqual(updated['approval_state'], 'PENDING')
         self.assertEqual((item_dir(self.content, item['content_id']) / 'selected_caption.txt').read_text(encoding='utf-8'), original_b)
-        self.assertEqual([s for s, _, _ in gen.calls], ['qa'])
+        self.assertEqual([s for s, _, _ in gen.calls], ['qa', 'style_qa'])
         self.assertEqual(file_hash(other), before)
 
     def test_wrong_color_wrong_mineral_and_unselected_candidate_are_blocked(self):

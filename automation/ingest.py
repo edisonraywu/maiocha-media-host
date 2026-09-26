@@ -152,7 +152,7 @@ def ingest_one(content: Path, folder: Path, brand: str) -> dict:
         expected = {p['file']: p['sha256'] for p in binding['source_images']}
         if actual != expected or binding.get('metadata_hash') != digest(provided):
             raise Blocked('BATCH_SOURCE_BINDING_CHANGED')
-        item.update(batch_id=binding['batch_id'], product_ref=binding['product_ref'],
+        item.update(batch_id=binding['batch_id'], product_ref=binding['product_ref'], purpose=binding.get('purpose', 'formal'),
                     declared_schedule=binding['declared_schedule'], schedule_source='user_declared',
                     publish_at=binding['declared_schedule'].get('publish_at'),
                     identity_source='user_declared_batch')
