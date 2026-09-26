@@ -24,7 +24,7 @@ class BatchTests(unittest.TestCase):
     publisher = fixtures.PipelineTests.publisher
 
     def intake(self, count=1, *, text=None, duplicate=False):
-        self.config['posting']['default_publish_time'] = '20:00'
+        self.config['posting']['default_publish_time'] = '10:00'
         source = self.root / 'attachments'
         source.mkdir(exist_ok=True)
         lines = ['Batch：2026-10-01～2026-10-14']
@@ -56,7 +56,7 @@ class BatchTests(unittest.TestCase):
             self.assertEqual(len(item['photos']), 6)
             self.assertEqual(len(item['selected_photo_ids']), 6)
             self.assertEqual(item['content_type'], 'CAROUSEL')
-            self.assertEqual(item['publish_at'], f'2026-10-{n + 1:02d}T20:00:00+08:00')
+            self.assertEqual(item['publish_at'], f'2026-10-{n + 1:02d}T10:00:00+08:00')
             self.assertEqual(item['approval_state'], 'PENDING')
             self.assertIsNone(item['approval'])
             folder = item_dir(self.content, item['content_id'])
@@ -226,7 +226,7 @@ class BatchTests(unittest.TestCase):
         approve(self.content, items[0], self.config)
         edited = update_product(self.content, self.config, manifest['batch_id'], 'BB001', {'price': 3280, 'publish_date': '2026-10-04'})
         self.assertEqual(edited['status'], 'DRAFT')
-        self.assertEqual(edited['publish_at'], '2026-10-04T20:00:00+08:00')
+        self.assertEqual(edited['publish_at'], '2026-10-04T10:00:00+08:00')
         self.assertEqual(edited['user_provided']['price'], 3280)
         self.assertEqual(file_hash(other), before)
         self.assertFalse(edited.get('approval'))
@@ -243,6 +243,15 @@ class BatchTests(unittest.TestCase):
         self.config['posting'].pop('default_publish_time', None)
         with self.assertRaisesRegex(Blocked, 'DEFAULT_PUBLISH_TIME_REQUIRED'):
             parse_intake('BB001 海藍寶 10/1', self.config)
+
+    def test_confirmed_ten_am_default_and_single_override_do_not_change_brand(self):
+        from automation.core import brand_config
+        config = brand_config('baobao')
+        original = copy.deepcopy(config)
+        rows = parse_intake('BB001 海藍寶 10/1\nBB002 綠碧璽 10/2 19:30\nBB003 紫水晶 10/3', config, year=2026)['products']
+        self.assertEqual([p['publish_time'] for p in rows], ['10:00', '19:30', '10:00'])
+        self.assertEqual(config['posting']['timezone'], 'Asia/Taipei')
+        self.assertEqual(config, original)
 
     def test_documented_intake_template_parses_without_yaml(self):
         self.config['posting']['default_publish_time'] = '20:00'

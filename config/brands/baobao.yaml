@@ -19,16 +19,16 @@ auto_publish_without_approval: false
 paused: true
 posting:
   timezone: Asia/Taipei
-  default_publish_time: null  # 一次性詢問已提出；由使用者確認後保存，不沿用未確認的樣板。
+  default_publish_time: '10:00'  # 使用者確認；單篇時間可覆蓋，不改品牌預設。
   posting_days:
   - 1
   - 3
   - 5
   posting_times:
-  - '20:00'
+  - '10:00'
   posts_per_week: 3
   defaults_need_review: true
-  note: 可修改的排程樣板，週二／四／六 20:00；並非演算法最佳時間。
+  note: 每日預設上午10:00（Asia/Taipei）；批次日期由使用者指定。舊非Batch週二／四／六樣板不覆蓋批次日期。
   max_lateness_hours: 24
   product_repeat_days: 30
 hosting:

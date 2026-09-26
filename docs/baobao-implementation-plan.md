@@ -1,5 +1,16 @@
 # 寶寶礦到了：稽核與實作計畫
 
+## 2026-09-26 Caption Calibration 延伸計畫（實作前）
+
+使用者已確認每日10:00 Asia/Taipei；保留單篇時間覆蓋。Batch基準5a27482／6aa9ef8、95tests、CI／Pages／Meta／Secrets均PASS。
+
+1. 從既有 prepare 抽出可重用的 Grounding→Basis 階段，加入校準前正式商品只能讀圖的硬性閘門。
+2. 校準商品沿用原 ingest／hash／圖片QA，新增私有1～3商品session、六種風格metadata、逐版Product QA、整批校準Preview；不產發布包，不批准、不排程、不POST。
+3. 新增自然語言回饋→保存偏好／例句／拒絕內容→可更新Style Profile。沒有使用者回饋前不建立正式Profile；確認風格與批准商品分開。
+4. 正式文案讀取已確認Profile；語氣／長短／CTA／emoji／signature規則與近期重複檢查，Style drift再生一次，仍失敗阻擋。Profile版本／QA與審核版本綁定，publisher仍不生成。
+5. 延伸CLI、docs、fixture tests（1／3商品×6圖、六風格、回饋持久化、更新、校準不發布、未校準不Final Caption、10:00與單篇覆蓋）。最後完整CI與maiocha回歸。
+6. 無真實商品時僅驗證系統機制，保存CALIBRATION_WAITING_FOR_PRODUCTS，CAPTION_STYLE_CALIBRATED=NO；正式production維持paused。
+
 ## 2026-09-26 Batch 延伸計畫（實作前）
 
 Meta、四個 Secrets、真實帳號與雲端 GET 驗證已完成（5188ba8；CI 36233762750、Dry Run 36233793937）。沿用現有 ingest、generator、QA、preview、approval、publisher、Pages 與 journal，不更動 maiocha。
