@@ -1,0 +1,56 @@
+name: Baobao scheduled Instagram publishing
+on:
+  schedule:
+    - cron: '7,22,37,52 * * * *'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: '只檢查，絕不發布'
+        required: true
+        type: boolean
+        default: true
+permissions:
+  contents: write
+concurrency:
+  group: instagram-baobao
+  cancel-in-progress: false
+jobs:
+  baobao:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    if: vars.PAUSE_ALL_BAOBAO_PUBLISHING != 'true'
+    env:
+      BAOBAO_IG_USER_ID: ${{ secrets.BAOBAO_IG_USER_ID }}
+      BAOBAO_PAGE_ID: ${{ secrets.BAOBAO_PAGE_ID }}
+      BAOBAO_IG_USERNAME: ${{ secrets.BAOBAO_IG_USERNAME }}
+      BAOBAO_PAGE_ACCESS_TOKEN: ${{ secrets.BAOBAO_PAGE_ACCESS_TOKEN }}
+      PAUSE_ALL_BAOBAO_PUBLISHING: ${{ vars.PAUSE_ALL_BAOBAO_PUBLISHING || 'false' }}
+      GITHUB_TOKEN: ${{ github.token }}
+      PYTHONUTF8: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: requirements-automation.txt
+      - run: python -m pip install -r requirements-automation.txt
+      - name: Read due pre-generated content and publish with safety gates
+        env:
+          DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run }}
+        run: |
+          mkdir -p .local
+          if [ "$DRY_RUN" = "true" ]; then
+            python -m automation.cli --workspace .local due --dry-run > .local/publish-result.json
+          else
+            python -m automation.cli --workspace .local due > .local/publish-result.json
+          fi
+      - name: Preserve sanitized run result
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: baobao-publish-result-${{ github.run_id }}
+          path: .local/publish-result.json
+          retention-days: 14
+          if-no-files-found: ignore
+

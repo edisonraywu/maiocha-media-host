@@ -1,0 +1,15 @@
+.env
+.env.*
+!.env.example
+*.dpapi
+*.key
+*.pem
+__pycache__/
+*.py[cod]
+.venv*/
+.pytest_cache/
+.local/
+content/
+test-output/
+*.log
+

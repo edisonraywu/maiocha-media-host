@@ -1,0 +1,57 @@
+brand: baobao
+display_name: 寶寶礦到了
+core_sentence: 寶寶，你的礦到了。
+meta_app_id: '1833218008099793'
+api_version: v26.0
+login_method: facebook_login
+target:
+  instagram_user_id: null
+  facebook_page_id: null
+  username: null
+env:
+  instagram_user_id: BAOBAO_IG_USER_ID
+  facebook_page_id: BAOBAO_PAGE_ID
+  username: BAOBAO_IG_USERNAME
+  token: BAOBAO_PAGE_ACCESS_TOKEN
+approval_mode: true
+paused: true
+posting:
+  timezone: Asia/Taipei
+  posting_days: [1, 3, 5]
+  posting_times: ['20:00']
+  posts_per_week: 3
+  defaults_need_review: true
+  note: 可修改的排程樣板，週二／四／六 20:00；並非演算法最佳時間。
+  max_lateness_hours: 24
+  product_repeat_days: 30
+hosting:
+  provider: github_pages
+  repository: edisonraywu/maiocha-media-host
+  branch: main
+  base_url: https://edisonraywu.github.io/maiocha-media-host
+  namespace: media/baobao
+publishing:
+  enabled_types: [SINGLE, CAROUSEL]
+  max_carousel_images: 10
+  max_posts_per_run: 1
+  journal_branch: automation-state
+  production_requires_verified_test: true
+generator:
+  provider: codex_batch
+  max_regenerations: 1
+  timeout_seconds: 900
+  allow_paid_api: false
+brand_voice:
+  primary_product: 天然水晶素串（每件商品仍不得自行推論礦種或處理方式）
+  positioning: 我自己看到也會想留下來、想戴的漂亮素串。
+  tone: [自然, 溫柔, 有顏色感, 有風景感, 有生活感, 有留白]
+  avoid: [官腔, 規格表口吻, 過度矯情, 每篇都像詩, 每篇都寫安靜柔柔]
+  principle: 商品本人決定文案內容；品牌風格只決定怎麼說。
+  content_styles: [商品主角, 顏色意境, 上手日常, 短句, 品牌生活, 新品, 貓咪品牌元素, 已查證小知識]
+  style_constraints:
+    上手日常: 只有實際上手照片才使用。
+    新品: 只有使用者明確提供新品資料才使用。
+    貓咪品牌元素: 僅可使用使用者提供的該隻貓照片，不得生成替身。
+    已查證小知識: 必須有使用者確認的資料與可靠來源。
+  imagery: [清晨, 天空, 海風, 雨後, 雲, 晚霞, 森林, 樹影, 月光, 晨霧, 冬日陽光, 秋天, 琥珀光, 窗邊, 風, 夜色, 深海, 日常]
+

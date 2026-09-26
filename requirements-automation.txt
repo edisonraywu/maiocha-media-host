@@ -1,0 +1,5 @@
+Pillow>=12.0,<13
+PyYAML>=6.0.2,<7
+jsonschema>=4.23,<5
+tzdata>=2025.1
+

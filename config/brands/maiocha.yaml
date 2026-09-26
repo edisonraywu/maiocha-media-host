@@ -1,0 +1,36 @@
+brand: maiocha
+display_name: 買房喵查局
+meta_app_id: '1833218008099793'
+api_version: v26.0
+login_method: facebook_login
+target:
+  instagram_user_id: '17841423624192593'
+  facebook_page_id: '1364481190072089'
+  username: maiocha.lab
+env:
+  instagram_user_id: INSTAGRAM_BUSINESS_ACCOUNT_ID
+  facebook_page_id: META_PAGE_ID
+  username: INSTAGRAM_USERNAME
+  token: META_PAGE_ACCESS_TOKEN
+approval_mode: true
+paused: true
+legacy:
+  enabled: true
+  publisher: 買房喵查局內容系統/11_系統工具/Instagram官方發布/同步發布CampaignV2.ps1
+  note: 現有品牌繼續由原入口與既有 QA 管理；此旗標只暫停新版入口，不會更動原流程。
+hosting:
+  provider: github_pages
+  repository: edisonraywu/maiocha-media-host
+  branch: main
+  base_url: https://edisonraywu.github.io/maiocha-media-host
+  namespace: media/maiocha
+posting:
+  timezone: Asia/Taipei
+  posting_days: []
+  posting_times: []
+  posts_per_week: 0
+publishing:
+  enabled_types: []
+  journal_branch: automation-state
+  production_requires_verified_test: true
+
