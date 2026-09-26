@@ -43,9 +43,41 @@
 
 ## 遠端部署驗證
 
-本機修復與稽核已 PASS；本次新版本 GitHub push、CI、Pages、遠端 dry-run／暫停狀態尚待本輪部署後記錄，不能以先前 CI 代替新版本結果。
+安全修復 commit：`0b3ee4ed06080601252832cfeac70bc3d8715c50`，已推送至現有 `main`，沒有 force push。以下均為該版本的實際結果。
+
+| 項目 | 結果與證據 |
+|---|---|
+| GitHub deployment | PASS；安全修復 commit 已包含於 remote main，後續驗收紀錄僅修改文件；原商品素材、brand config、baobao 發布 workflow 無變更 |
+| CI | PASS；[36250094251](https://github.com/edisonraywu/maiocha-media-host/actions/runs/36250094251)，Python 全套及 Windows／Linux PowerShell 三個 jobs 全部 success |
+| Pages | PASS；[36250093766](https://github.com/edisonraywu/maiocha-media-host/actions/runs/36250093766) 部署成功；部署後再次 GET 現有正式圖片，HTTP／image/jpeg／SHA-256 與本機一致 |
+| Workflow validation | PASS；GitHub 已接受新 workflow，push CI 及手動 dry-run 都實際成功執行 |
+| baobao live dry-run | PASS；[36250104496](https://github.com/edisonraywu/maiocha-media-host/actions/runs/36250104496)，`VALIDATION_PASS`、`NO_DUE_CONTENT`、Instagram POST=0 |
+| Meta / Account Gate | PASS；由 Actions 使用實際 Secrets，GET 驗證 Page 日常收藏所 `1348149615047101` → IG `17841431857348052` → `babycrystal.tw`；API access 與帳號閘門通過 |
+| Secrets | PASS；GitHub API 可列出四個 BAOBAO Secret 名稱，Actions 確認存在且真實 API 可用；沒有輸出 Secret 值 |
+| Durable pause | PASS；遠端 `state/baobao.json` 保持 `paused=true`、`production_ready=false`，items=0、queue=0；未 Resume |
+| Approval | PASS；Actions 驗證 `approval_mode=true`、`auto_publish_without_approval=false`；沒有商品獲得批准 |
+| Secret audit | PASS；64 份公開文字檔與既有 commit 掃描無命中；另唯讀檢查 164 份私人報告／Preview／文件／輸入提示 log，無 Secret 洩漏；`.env` 未進版本庫 |
 
 沿用 MaiOcha Lab Automation（1833218008099793）及 Facebook Login。已驗證的帳號為 maiocha.lab／藍屋生活誌與 babycrystal.tw／日常收藏所；BAOBAO 四個 Secrets 名稱保持獨立。部署階段只讀取 Secret 存在狀態，不輸出值。
+
+## 修復後唯讀 Multi-Brand Audit
+
+四個 maiocha Campaign 的 40 份來源／hash／URL／object key／namespace 全部通過；每個 Campaign 都以記憶體副本重現「只換成 baobao URL」，四次全部被拒絕。此複查寫檔=0、Instagram request=0。12 份已部署工具與版本庫內容一致。
+
+| 檢查範圍 | 隔離結果 |
+|---|---|
+| Content、inbox、Batch、商品 metadata、content_id、照片 binding | PASS；baobao 使用自己的 content 根目錄、品牌 ID、逐商品 manifest／hash；目前尚無真實商品 |
+| Grounding、Caption Basis、captions、六種 Style、Style Profile | PASS；品牌 context 先驗證；maiocha 不讀 baobao Profile；正式 Profile 尚未建立 |
+| Preview、calibration、approval | PASS；校準只在 baobao；校準與一般查看 Preview 不產生發布批准；跨品牌 approval 拒絕 |
+| Assets、media、Hosting URL、remote object key、cache | PASS；共享 repository 內依 policy／release 分隔；更換任何快取 identity 會失效 |
+| Publisher、scheduler、history、archive、duplicate protection | PASS；各自 target／journal／queue／history，跨品牌紀錄及排程拒絕；maiocha 原流程保留 |
+| Pause、Secrets、IG／Page mapping | PASS；各自設定與帳號，沒有環境變數名稱覆蓋；baobao 仍 paused |
+| Shared engine、launcher、write／delete／cleanup | PASS；共用安全核心讀明確 scope，通用入口必須指定品牌；跨品牌上傳、覆寫、刪除、清理拒絕 |
+
+`SHARED`：repository 基礎設施、`automation/` 共用元件、`safety/`、CI／Pages。
+`MAIOCHA_ONLY`：`買房喵查局內容系統/`、已登記的 `media/maiocha-<campaign>/`、`legacy/maiocha/` 部署來源。
+`BAOBAO_ONLY`：`content/baobao/`、`config/brands/baobao.yaml`、`media/baobao/`、`releases/baobao/`、`state/baobao.json`。
+`POSSIBLE_MIXING_RISK`：原三項風險均已修復並有回歸案例；目前沒有未解決的 CRITICAL／HIGH 或會跨品牌發布／覆寫／批准的問題。舊 repository 名稱屬歷史命名，不構成 namespace 混用。
 
 ## 下一個 checkpoint
 
@@ -56,3 +88,15 @@
 目前實際商品=0、Instagram POST=0、Media ID=無、CAPTION_STYLE_CALIBRATED=NO。approval_mode=true、auto_publish_without_approval=false、production paused。第一次實物 test publish 仍需日後單獨明確批准。
 
 安全規則與排錯：[Multi-Brand Isolation / Safety](multi-brand-isolation.md)。日常操作：[使用說明](baobao-automation.md)；第一組照片格式：[校準說明](baobao-caption-calibration.md)。
+
+## 最終工程狀態
+
+```text
+MULTI_BRAND_FILE_ISOLATION = PASS
+SAFE_FOR_BAOBAO_CALIBRATION_PHOTOS = YES
+READY_FOR_BATCH_PHOTO_WORKFLOW = YES
+CAPTION_CALIBRATION_SYSTEM_READY = YES
+WAITING_FOR_CALIBRATION_PRODUCTS = YES
+```
+
+這些狀態表示工程已可接收真實校準照片，並停在私人 Calibration Preview 等待風格回饋；不表示已校準品牌 Style、已驗收真實商品文案、已完成 test publish，或允許跳過逐篇批准。正式 Batch 的 Caption finalization 仍須先完成 Style Calibration。
