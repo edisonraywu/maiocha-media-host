@@ -1,54 +1,72 @@
-# 寶寶礦到了｜Batch 工程驗收
+# 寶寶礦到了｜Batch 與文案風格校準工程驗收
 
-> 進行中的延伸：每日10:00 Asia/Taipei已保存。Caption Calibration 本機131項回歸、maiocha8項／40檔不變、3商品×6照片×6Style的HTML／JSON驗證已PASS；本次程式更新部署後接續雲端CI與唯讀帳號Dry Run，再更新本報告。下一步是等待1～3條校準商品，不要求正式Batch。風格尚未選定，production仍paused，Instagram POST=0。以下保留先前PART A驗收依據。
-
-驗收日期：2026-09-26（Asia/Taipei）。本次依最新要求，以「所有收件工程準備完成，只等未來一週／兩週商品」為終點，不要求現在提供照片或測試發布。
+驗收日期：2026-09-26，Asia/Taipei。已保存 **Default Publish Time = 10:00 Asia/Taipei**，單篇時間覆蓋預設且不修改品牌設定。
 
 `READY_FOR_BATCH_PHOTO_WORKFLOW = YES`
 
-`WAITING_FOR_BATCH_PHOTOS = YES`
+`CAPTION_CALIBRATION_SYSTEM_READY = YES`
 
-目前 checkpoint：WAITING_FOR_BATCH_PHOTOS。每日預設時間：10:00。
+`WAITING_FOR_CALIBRATION_PRODUCTS = YES`
 
-| 驗收項目 | 結果與證據 |
+目前 checkpoint：等待第一組 **1～3 條真實校準商品，每條約六張照片**。不要求正式 7～14 天 Batch。`CAPTION_STYLE_CALIBRATED = NO`：尚未收到真實照片與使用者風格回饋，沒有預先建立正式風格偏好。
+
+## 部署與基礎整合
+
+| 項目 | 真實結果／證據 |
 |---|---|
-| A. GitHub | PASS，本次程式已部署；基準 8e4ced9a72d40a3afdfc629f0cefee91448c9eed；未回滾 commits |
-| B. Actions / CI | https://github.com/edisonraywu/maiocha-media-host/actions/runs/36239856533 |
-| C. Pages | https://github.com/edisonraywu/maiocha-media-host/actions/runs/36239855856；沿用 maiocha-media-host |
-| D. Meta authorization | PASS；沿用 MaiOcha Lab Automation / 1833218008099793、Facebook Login、v26.0 |
-| E. Secrets | PASS；BAOBAO_PAGE_ID、BAOBAO_IG_USER_ID、BAOBAO_IG_USERNAME、BAOBAO_PAGE_ACCESS_TOKEN 已存在；只驗證存在，不輸出值 |
-| F. Account Verification | PASS；日常收藏所 / Page 1348149615047101 → IG 17841431857348052 → babycrystal.tw；真實 API 關聯與專用帳號核對 |
-| G. Batch Architecture | PASS；batches/{batch_id} 保存清單與分組，items/{content_id} 沿用原管線；沒有第二套 publisher |
-| H. Natural Language Intake | PASS；逐行／多行商品清單、日期、時間、選填價格珠徑 SKU；原始宣告保存；歧義只擋該筆 |
-| I. 7 / 14 商品 | PASS；fixtures 各商品6張，42／84張綁定、再 prepare 重用、指定日期保留 |
-| J. 6 Photo Logic | PASS；逐張 photo_type、清晰度、曝光、白平衡、可見度、構圖、相似度、排序理由；未採用圖與完全重複在 Preview 顯示 RECOMMEND_EXCLUDE，原圖保留 |
-| K. Product Binding | PASS；每圖 content_id / asset_id / SHA256；同hash跨商品阻擋；metadata、照片、日期、caption 與 QA 綁定同項目 |
-| L. User Declared Crystal Name | PASS；正式商品必須由使用者提供 crystal_name；照片與 product_name 不能補猜，缺少只做觀察並 NEEDS_INFO |
-| M. Schedule Binding | PASS；保留使用者日期，不受舊每週三篇樣板覆蓋；同日多篇提示；缺日期不私排；預設时间仍需一次確認（若未設定） |
-| N. Caption Grounding / QA | PASS（結構與安全 fixture）；三版均驗證使用者礦名與照片色彩／特徵；獨立圖片QA檢查選定版；失敗再生一次後仍阻擋 |
-| O. Batch Preview | PASS（HTML／JSON結構、7商品、43個圖片連結含重複原圖）；日期、照片順序與原因、A/B/C、Selected與理由、未知資料、QA、狀態俱全 |
-| P. Partial Approval | PASS；指定日期範圍只批准該範圍；有未完成項目時不部分誤批；其餘維持 READY_FOR_REVIEW |
-| Q. Publisher / Approval | PASS（mock integration）；未批准在最上層拒絕；批准指紋綁定文案／照片／日期；publish無生成器呼叫；batch prepare無批准／queue／POST |
-| R. Hosting / Preflight | 共用 Pages 與 /media/baobao/{content_id}/，已測 URL/MIME/hash failure gate；公開商品需明確批准後才上傳，未使用fixture冒充實物Hosting |
-| S. Pause / Duplicate | PASS；journal pause及環境pause均攔截；成功記Media ID與hash，禁止自動重發；目前真實journal paused=true、production_ready=false、queue=0、items=0 |
-| T. baobao Tests | 96 項本機測試 PASS；隔離fixtures／fake Meta，沒有真實商品發布 |
-| U. maiocha Regression | 8 項原有測試 PASS；40個原檔0變更；沒有改maiocha帳號、素材或workflow |
-| V. Cloud Dry Run | https://github.com/edisonraywu/maiocha-media-host/actions/runs/36238971349；專用 Secrets、live account、pause 只讀驗證，Instagram POST=0 |
+| GitHub deployment | PASS；程式版本 `af1b3517c8fdb6ea07e1bb1ca9521665190bba8f` 已推送，沿用既有 commits，無回滾 |
+| Actions / CI | PASS；[CI](https://github.com/edisonraywu/maiocha-media-host/actions/runs/36241770138)；131 項 baobao tests |
+| GitHub Pages | PASS；[Pages deployment](https://github.com/edisonraywu/maiocha-media-host/actions/runs/36241769870)；沿用 maiocha-media-host |
+| Meta | PASS；MaiOcha Lab Automation / 1833218008099793，Facebook Login、Graph v26.0 |
+| Secrets | PASS；BAOBAO_PAGE_ID、BAOBAO_IG_USER_ID、BAOBAO_IG_USERNAME、BAOBAO_PAGE_ACCESS_TOKEN 皆存在且由 Actions 使用；沒有輸出 Secret 值 |
+| Account Verification | PASS；真實 API：日常收藏所 → 寶寶礦 IG `babycrystal.tw`，Page、IG ID、username、權限與品牌 namespace 核對 |
+| Cloud Dry Run | PASS；[唯讀帳號／Secrets／journal 驗證](https://github.com/edisonraywu/maiocha-media-host/actions/runs/36241800641)；Instagram POST=0 |
+| Pause | PASS；journal paused=true、production_ready=false、queue=0、items=0；環境變數 pause 與發布途中 pause 測試通過 |
+| maiocha regression | PASS；原有 8 項狀態機測試，全數通過；40 個原檔 hash 完全未變 |
+| Security | Token 未寫入 repo、Preview、manifest 或此報告；私人 content／.env／DPAPI 不在提交內容 |
 
-## 真實資料與工程 fixtures 的界線
+## Batch Final Acceptance
 
-本次新增 `automation/batch.py`、`tests/test_batch.py`、`docs/baobao-batch-intake.md`；延伸既有 ingest、pipeline、schema、QA、calendar、preview、CLI及approval。Hosting、Meta publisher、GitHub journal 與原maiocha程式保持沿用。Windows長路徑的舊版本備份改存私人 revisions 雜湊目錄，原始檔不覆寫。
+| 項目 | 結果 |
+|---|---|
+| Batch Architecture / Natural Language Intake | PASS；重用 batches、items、CLI，保存使用者原始宣告；不用手寫 YAML |
+| 7-day / 14-day Batch | PASS（fixtures）；7／14 商品，各6張，共42／84張，不跨商品 |
+| Six Photo Logic / Product Binding | PASS；asset_id、content_id、hash；保留原圖；重複與劣質照片明示 RECOMMEND_EXCLUDE 和原因 |
+| User Declared Crystal Name | PASS；礦名只由使用者提供；缺少可先 Grounding，但不能完成文案 |
+| Schedule Mapping | PASS；保留使用者日期、偵測撞期、10:00預設、19:30／20:30單篇覆蓋；未批准只有 proposed schedule |
+| Grounding / Caption Basis / Caption Pipeline | PASS（結構與安全 fixtures）；實際商品照片決定描述，身份與價格等只來自手動資料 |
+| Product Caption QA | PASS；攔錯色、錯礦名、跨商品內容、未知事實、失效照片／文字 hash；最多重試一次 |
+| Batch Preview / Partial Approval | PASS；圖片、順序、三候選、Selected、日期、狀態；指定範圍只批准該範圍 |
+| Unapproved Publish Block | PASS；發布與 queue 頂層要求明確批准，Style 校準不取代商品批准 |
+| Publisher / Hosting / Archive / Duplicate | PASS（mock integration）；沿用既有 publisher、Pages namespace、journal；正式發布只讀保存且批准的 caption，不臨時生成；保存Media ID與hash並防重複 |
 
-真實商品数=0；真實 Instagram POST=0；真實 Media ID 尚無。視覺品質與中文實際發布驗收保留到收到商品後；這不冒充本次fixture測試已通過。瀏覽器對 file URL 有安全限制，未作瀏覽器目視驗收，採本機HTML解析及每張圖片解碼／路徑檢查。完整依據在工作區 .local/ 的安全報告，沒有Token。
+## Caption Calibration Acceptance
 
-## 每週實際工作流
+| 項目 | 結果 |
+|---|---|
+| Calibration Architecture | PASS；私人 session、1～3產品、每條獨立內容ID；重用 ingest、grounding、basis、QA 和照片排序 |
+| Six Style Generator | PASS（fixtures）；每商品 A商品貼合／B顏色意境／C風景／D極簡／E日常／F品牌，六版均綁定當前商品，沒有自選唯一品牌Style |
+| Style Metadata | PASS；tone、length、poetry、imagery、daily life、sales、CTA、emoji、signature、why it fits 均保留 |
+| Calibration Preview | PASS；3商品×6照片×6Style 的 HTML／JSON 結構；18圖片連結與圖像解碼、18候選及QA綁定通過；非真實商品品質驗收 |
+| Feedback Parser | PASS；自然中文喜歡／排除、混合句、語氣／段落、emoji、CTA、signature、長短等；只保留明確偏好，歧義逐處保存待確認 |
+| Profile Mechanism / Persistence / Update | PASS；收到明確回饋才保存私人 `content/baobao/config/baobao-caption-style.yaml`；保留來源、例句、排除句、版本，確認後才 calibrated；之後可更新 |
+| Style QA | PASS；獨立模型檢查＋確定性文字規則，profile／caption／content hash 綁定；漂移最多再生一次，仍FAIL不得READY |
+| Wording Repetition Detection | PASS；近期形容詞、開頭、結尾、風景、CTA、品牌句與文字相似度；校準Preview顯示提醒，正式批次納入Style QA |
+| Formal Batch Calibration Gate | PASS；未CALIBRATED，只 ingest／photo QA／grounding，WAITING_FOR_CALIBRATION；不能Final Caption／approve／schedule |
+| No Schedule / Publish During Calibration | PASS；校準不存發布日期；reserved calibration ID 與 purpose 在 publisher／queue 最上層拒絕，偽造APPROVED也不能發，test publish 同樣拒絕 |
+| Profile Changes / Reviewed Caption | PASS；更新風格前先撤回舊queue，未發布商品重新QA與審核；發布使用已審核文字，不載入生成器 |
+| Tests / Regression | PASS；本機 131 項 baobao、8 項 maiocha；相同程式在GitHub CI通過 |
 
-使用者提供7～14條、每條約6張照片＋水晶名稱＋每天發哪條 → Codex整理Batch → 逐商品Ingest／Grounding／Caption Basis／三版Caption／QA／Cover與Carousel → 整批Preview → READY_FOR_REVIEW → 等待明確批准。
+實際商品照片=0、實際Instagram POST=0、實際Media ID=無。工程 fixtures 僅驗證流程與安全，沒有冒充真實水晶圖、真實文案品質或使用者已選定的品牌風格。校準Preview以本機HTML解析、路徑／圖片解碼驗證；因瀏覽器 file URL 限制，沒有宣稱完成瀏覽器目視驗收。
 
-指定範圍批准後，只對指定內容執行Hosting／Publish Preflight／Schedule。首篇測試需要另外明確批准；未完成前production維持paused。發布時只讀已批准檔案，禁止臨時改Caption。成功保存Media ID與hash並歸檔。保持 approval_mode=true、auto_publish_without_approval=false。
+## 日常使用與下一個 checkpoint
 
-## 剩餘一次性操作
+第一次：1～3條照片＋每條水晶名稱 → 商品觀察 → 六種Style Preview → 使用者回饋 → 確認Style Profile。校準不發文。
 
-無工程設定待使用者處理；下一件事是未來提供真實商品批次。
+之後：7～14條照片＋名稱＋指定日期 → Batch → Grounding／Basis → 已確認Style → 三候選／Selected → Product QA／Style QA → Cover／Carousel／Preview → READY_FOR_REVIEW → 等使用者明確批准 → 才允許Hosting／Preflight／Schedule或Publish。
 
-舊的完整實物上線標準仍為 `READY_FOR_PHOTO_ONLY_WORKFLOW = NO` / `READY_FOR_BAOBAO_AUTOMATION = NO`，直到真實商品經審核、明確批准並完成一篇test publish。新的 Batch readiness 只描述照片到待審核的工程已備妥，不授權任何自動發文。
+目前 `approval_mode=true`、`auto_publish_without_approval=false`，production仍paused。第一篇真實測試需要日後另外批准、真實照片／Caption／帳號／Media ID驗證；這不是本次工程停止條件，亦不由校準批准替代。
+
+**沒有需使用者完成的工程設定；現在只等1～3條校準商品照片與水晶名稱。**
+
+舊的實物發布驗收旗標 `READY_FOR_PHOTO_ONLY_WORKFLOW=NO`、`READY_FOR_BAOBAO_AUTOMATION=NO` 保留，直到日後明確批准的一篇實物test publish完成。本次三個YES表示Batch與Calibration機制已備妥，不代表偏好已選定、實物品質已驗證或可無審核發布。
