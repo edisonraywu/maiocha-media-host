@@ -36,13 +36,16 @@
 - [x] 品牌設定與安全核心、商品 ingest、Codex 批次 provider（尚無真實商品照片可跑視覺驗收）。
 - [x] Grounding/caption/QA/preview/calendar 與簡單 CLI。
 - [x] Hosting promotion、Meta publisher、durable history、Actions、pause 程式；遠端品牌 journal 已實際建立並保持暫停。
-- [x] 41 個新測試、空 inbox dry-run、40 個 maiocha 原檔雜湊、原有 8 個狀態機測試、唯讀帳號與 Hosting 回歸、使用手冊。
-- [ ] 遠端程式部署及 baobao 線上驗證：GitHub 拒絕 workflow 寫入，既有 fine-grained PAT 須增加 Workflows write；Meta 專用帳號欄位與 Token 尚缺。
+- [x] 更新為 57 個測試、本機與遠端空 inbox dry-run、40 個 maiocha 原檔雜湊、原有 8 個狀態機測試、唯讀帳號與 Hosting 回歸、使用手冊。
+- [x] GitHub PAT 權限已解除，原 commits 與人工批准更新 e50e093 已部署，CI／Pages／手動 Dry Run PASS，Secrets API 可讀。
+- [ ] baobao 線上帳號驗證：現有 Meta User Token me/accounts 仍回傳 0，待本人授權寶寶礦 Page／IG；品牌帳號值與 Secrets 尚缺。
 - [ ] 一篇真實測試 Feed、確認帳號/中文/圖片、保存 Media ID，才允許 production readiness。
 
 ## 最終交付狀態
 
-詳見 `docs/baobao-acceptance-report.md`。本機程式已完成並保存 Git commit；新測試使用隔離的合成 fixture 與假 Meta，不能取代實際商品與 Instagram 驗收。未進行任何真實 Instagram POST，`READY_FOR_BAOBAO_AUTOMATION = NO`。
+依最新使用者指示，正式模式固定為人工批准，取代本計畫初期可切 auto 的設計：`approval_mode=true`、`auto_publish_without_approval=false`。Prepare 停在 READY_FOR_REVIEW，日曆為 PROPOSED_SCHEDULE；連第一次 test publish 都要明確批准，不能自行 approve-all。
+
+詳見 `docs/baobao-acceptance-report.md`。程式已保存 Git commit 並部署；57 項新系統測試使用隔離合成 fixture 與假 Meta，不能取代實際商品驗收。未進行任何真實 Instagram POST。`READY_FOR_PHOTO_ONLY_WORKFLOW = NO`；`READY_FOR_BAOBAO_AUTOMATION = NO`。
 
 ## 文件依據
 

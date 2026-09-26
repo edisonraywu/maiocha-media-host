@@ -1,248 +1,175 @@
-# 寶寶礦到了｜實作與驗收報告
+# 寶寶礦到了｜照片準備與人工批准驗收
 
-驗收日期：2026-09-26，Asia/Taipei。
+更新：2026-09-26，Asia/Taipei。延續原 commits，沒有重建專案或回滾。
 
-**READY_FOR_BAOBAO_AUTOMATION = NO**
+**READY_FOR_PHOTO_ONLY_WORKFLOW = NO**
 
-本機系統、操作入口、文件與測試已完成。41 個新系統測試及 8 個原有狀態機測試通過。原本 maiocha 的 40 個檔案未變動，實際帳號查詢與原有公開圖片驗證成功。尚未完成遠端 workflow 部署、寶寶礦授權、真實商品文案驗收及第一篇 Instagram 測試，因此沒有將 production 標為 ready。
+GitHub checkpoint 已解除，程式及 Actions 已部署。新的人工批准流程已通過本機與遠端測試；尚缺 baobao Meta 資產授權、真實商品內容驗收及你對第一篇測試的明確批准。本次真實 Instagram POST 為 **0**。
 
-目前為 `approval_mode=true`、遠端 `paused=true`、`production_ready=false`，正式排程與發布歷史都是空的。本次實際 Instagram 發布 POST 次數為 **0**。
+固定模式：`approval_mode=true`、`auto_publish_without_approval=false`。遠端 journal：`paused=true`、`production_ready=false`、queue 0、published items 0。
 
 BLOCKERS:
 
-1. 既有 GitHub fine-grained PAT 沒有 Workflows 寫入權限，GitHub 已拒絕本次 push。程式完整保存在本機 commit，遠端 main 未改；需要帳號本人提高原 Token 的該 repo 權限。
-2. 既有 Meta User Token 的 `me/accounts` 回傳 0 個已授權粉專。缺寶寶礦的確定 username、IG ID、Page ID 與專用 Page Token；必須在同一 Meta App 授權該品牌資產。
-3. 工作區沒有寶寶礦真實商品照片。無法誠實驗收「這篇就是在寫這一串」、跑真實內容 Preflight，或發第一篇測試。
+1. **Meta 資產授權與帳號／Secrets：**既有 User Token 的實際 `me/accounts` 回傳 0 個粉專。四項所需 permissions 已 granted，但沒有寶寶礦可核定的 Page／IG／username／Page Token，因此尚不能設定四個品牌 Secrets。
+2. **真實商品：**目前 inbox 無實際商品照片。照片品質、AI grounding、商品貼合文案與公開 baobao Hosting，尚不能以真實商品驗收。
+3. **審核與第一篇實測：**必須先提供真實 Preview，等你明確說「這篇可以測試發」，才能做正式 Preflight 與一篇測試。尚無 baobao Media ID。
 
-## A. 原本專案架構摘要
+## A. GitHub 狀態
 
-`New project` 工作區本身不是 Git repository。唯一業務 Git checkout 是 `maiocha-media-host-staging`，使用既有 `edisonraywu/maiocha-media-host` public repository，main 根目錄由 GitHub Pages 提供媒體。
+**PASS。**既有 fine-grained PAT 權限更新已實際生效。原 `6a89988`、`a668131` 已成功推送；本次功能更新 commit 為 `e50e0933dd896965cdb30d32b3f91718831ec0fd`，位於同一 `edisonraywu/maiocha-media-host` main。後續驗收文件更新不改動此已測試的程式。
 
-內容、素材與 PowerShell 工具位於 `買房喵查局內容系統`。正式入口 `11_系統工具/Instagram官方發布/同步發布CampaignV2.ps1` 是特定活動組合：6 張輪播、1 Reel、3 Stories，具有固定順序與原品牌限制。
+保留原 repo、Meta App、GitHub Pages 與 maiocha 入口。沒有 force push、回滾或新建另一套服務。tracked／待提交文字及新增 commits 的秘密模式掃描通過，沒有 `.env`、DPAPI 或 Token 入庫；稽核只記錄檔名與結果，不輸出秘密值。
 
-原流程已具 manifest、SHA256、preflight、核准、容器狀態、CSV 發布歷史與不確定結果停止機制。生成採本機／Codex 批次作業，沒有可直接重用的商品照片 grounding 引擎。遠端原有 Actions 只有 Pages deployment，沒有 Instagram cron。
+## B. GitHub Actions 狀態
 
-修改前已完成現況盤點與 [implementation plan](baobao-implementation-plan.md)。
+**已部署且實際成功：**
 
-## B. 重用哪些既有功能
-
-| 既有元件 | 本次處理 |
+| 驗證 | 結果與證據 |
 |---|---|
-| GitHub repository、main、Pages | 沿用，新增 `media/baobao/{content_id}/` namespace |
-| GitHub DPAPI 憑證及 AskPass | 重用，不把 Token 寫入程式或輸出 |
-| Meta App `1833218008099793` | 沿用同 App 與 Facebook Login／Graph v26.0 |
-| container → polling → media_publish | 延伸同一 API 流程，支援一般單圖／輪播 |
-| manifest、hash、preflight、history 與不確定結果停止原則 | 品牌化並加入跨程序 GitHub CAS 持久紀錄 |
-| 原 maiocha publisher、內容及媒體 | 保留原入口原樣，不移植其固定 Campaign 限制 |
+| 新版 CI，Ubuntu／Python 3.12 | [PASS：36225529967](https://github.com/edisonraywu/maiocha-media-host/actions/runs/36225529967)，程式 commit `e50e093` |
+| 新版 baobao 手動 Dry Run | [PASS：36225579227](https://github.com/edisonraywu/maiocha-media-host/actions/runs/36225579227)，程式 commit `e50e093` |
+| 同 repo Pages deployment | [PASS：36225529431](https://github.com/edisonraywu/maiocha-media-host/actions/runs/36225529431) |
+| Actions 實際 GITHUB_TOKEN 讀取 journal | artifact `journal_access=PASS` |
+| 人工批准／暫停設定 | artifact `approval_mode=true`、`auto_publish_without_approval=false`、`paused=true` |
+| 真實空內容 Dry Run | `NO_DUE_CONTENT`、`api_post_requests_sent=0` |
 
-使用 Python 共用 adapter 的理由是原 PowerShell publisher 強制固定組合；直接改掉其前置条件會影響正常活動。沒有新建 repo、Meta App、Hosting 服務或付費 AI API。
+已下載並檢視上面 dry-run 的真實 artifact，保存於本機 `.local/baobao-actions-36225579227.json`。這是雲端連通與安全驗證，不冒充真實商品完整 Dry Run。
 
-## C. 修改哪些檔案
+baobao workflow 只讀 BAOBAO Secrets、品牌 config、releases 與品牌 journal，獨立 concurrency，不呼叫 maiocha publisher。原遠端沒有 maiocha Instagram workflow，只有共用 Pages deployment；不能宣稱「已執行一個原本不存在的 maiocha IG workflow」。原 maiocha 本機發布程式已另做回歸。
 
-相對本次開始時的 `0d40846`，既有 Git tracked 檔案沒有修改或刪除，都是新增功能。40 個原 maiocha 系統檔案的雜湊完全相同；只在工具旁新增品牌入口。
+## C. Meta 狀態
 
-新增程式的後續修正包括：不可確定的發布結果不宣稱「未發布」、損壞 ICC 檔回報照片問題、以及發布成功後紀錄失敗／程序中斷的防重複測試。
+**MANUAL_ACTION_REQUIRED。**沿用 `MaiOcha Lab Automation`（App ID `1833218008099793`），Facebook Login／Graph v26.0。已重新 inspect 原流程：DPAPI 保存 App Secret 與 User Token；由原 App 換長效 User Token，再取得 Page Token，檢查 Page→IG→username。
 
-## D. 新增哪些檔案
+2026-09-26 15:05 的唯讀 API 稽核：`me/accounts.data=[]`，沒有後續分頁；`pages_show_list`、`pages_read_engagement`、`instagram_basic`、`instagram_content_publish` 為 granted。這代表目前無法從該授權列出寶寶礦資產，不代表 FB↔IG 沒連好。需要本人重新選擇 App 可存取的 Page／IG。
 
-同一 Git repository 中：
+不新建 App，不要求重做 FB↔IG 連結。新接入工具使用原 App Secret 換 token、檢查必需 permissions，核對指定 username，只在 API 驗證成功後寫入 baobao 設定。
 
-| 檔案 | 用途 |
-|---|---|
-| `.gitignore`、`.gitattributes` | 排除私人素材與秘密、統一文字格式 |
-| `requirements-automation.txt` | Python 依賴 |
-| `config/brands/baobao.yaml`、`maiocha.yaml` | 獨立品牌、帳號、文風、排程設定 |
-| `automation/__init__.py`、`core.py` | 共用路徑、設定、雜湊、原子寫入、安全錯誤與鎖 |
-| `automation/ingest.py` | 每商品獨立 ingest、original、處理圖、縮圖、去重 |
-| `automation/schemas.py`、`generator.py` | 結構化 grounding／basis／候選／視覺 QA；本機 Codex provider |
-| `automation/qa.py`、`pipeline.py` | 來源綁定、內容 QA、有限重生與 batch prepare |
-| `automation/calendar.py`、`preview.py` | 內容日曆與本機 HTML／JSON 預覽 |
-| `automation/release.py` | 核准指紋、公開發布包、素材與 QA 完整性 |
-| `automation/network.py`、`publisher.py` | 帳號驗證、Meta API、Preflight、Single／Carousel |
-| `automation/journal.py`、`operations.py` | 遠端互斥紀錄、防重複、Hosting、排程、歸檔、實測驗收 |
-| `automation/connect.py`、`cli.py` | 同 App 授權接入與日常簡單操作 |
-| `.github/workflows/automation-ci.yml` | Python CI 測試 |
-| `.github/workflows/baobao-publish.yml` | 只讀預生成內容的品牌隔離 cron |
-| `tests/test_automation.py`、`test_network_journal.py` | 41 個單元、整合及 dry-run 測試 |
-| `docs/baobao-automation.md`、`baobao-acceptance-report.md` | 操作手冊與本驗收報告 |
+## D. Secrets 狀態
 
-本機工作區另有：
-
-- `baobao.cmd`、`baobao.ps1`：日常入口。
-- `tools/Connect-Baobao.ps1`：不顯示 Token 的授權輸入與環境檔寫入。
-- `tools/Deploy-Baobao-Code.ps1`：檢查 remote、秘密與 staged 範圍後安全推送，不 force push。
-- `tools/Audit-Baobao-Access.ps1`、`Verify-Maiocha-Unchanged.ps1`：可重跑的權限稽核與回歸驗證。
-- `買房喵查局內容系統/11_系統工具/Instagram官方發布/同步發布品牌.ps1`：原工具區的新品牌入口。
-- `content/baobao/.env.example`、`product.example.yaml`、inbox、空日曆、空 Preview、history。
-- `docs/baobao-implementation-plan.md`、本報告與操作手冊。
-- `.local/maiocha-baseline.json`、`maiocha-regression.json`、`baobao-access-audit.json`、`baobao-readiness.json`：本機驗證證據，不提交公開 repo。
-
-## E. baobao 最終資料夾結構
+GitHub Secrets API **PASS**；實際名稱列表為空，Actions 的四個品牌 Secret presence 也都是 false：
 
 ```
-New project/
-  baobao.cmd / baobao.ps1
-  content/baobao/
-    .env.example
-    product.example.yaml
-    inbox/{商品資料夾}/
-      商品照片.jpg
-      product.yaml                  可省略
-    items/{content_id}/              ingest 後產生
-      originals/
-      processed/
-      item.json
-      product_grounding.json
-      caption_basis.json
-      caption_candidates.json
-      selected_caption.txt
-      vision_qa.json
-      caption_qa.json
-      preflight.json
-      revisions/
-    calendar/calendar.yaml
-    calendar/calendar.json
-    preview/preview.html
-    preview/preview.json
-    history/published-history.json
-    archive/{content_id}/            成功後 sync 產生
-  maiocha-media-host-staging/
-    automation/
-    config/brands/{baobao,maiocha}.yaml
-    media/baobao/{content_id}/        核准選圖後產生
-    releases/baobao/{content_id}/     caption 與 manifest
-    .github/workflows/
-    tests/
+BAOBAO_PAGE_ID
+BAOBAO_IG_USER_ID
+BAOBAO_IG_USERNAME
+BAOBAO_PAGE_ACCESS_TOKEN
 ```
 
-遠端另外有同 repo 的 `automation-state` 分支，`state/baobao.json` 保存 pause、正式啟用證據、queue、發布 intent、Media ID 與歷史。原始圖片、product.yaml、完整 grounding 與候選文案不公開。
+已實作 `baobao secrets-sync`：先確認專用 credentials 與 Meta 帳號，再以 GitHub repository public key／libsodium sealed box 加密，僅寫入這四個 BAOBAO 名稱，最後讀取名稱 metadata 確認，不讀回或印出值。[GitHub 官方加密方法](https://docs.github.com/en/rest/guides/encrypting-secrets-for-the-rest-api)
 
-## F. Brand Config
+`tools/Connect-Baobao.ps1` 完成安全隱藏輸入與 API 驗證後，會自動接續 Secrets 同步。尚未有 baobao 真實值，因此本次沒有虛填 Secret，也未複製 maiocha Token 代用。
 
-- 品牌：寶寶礦到了，核心句「寶寶，你的礦到了。」
-- 原則：商品本人決定內容；品牌只決定怎麼說。
-- `approval_mode: true`；remote journal 目前暫停，production 未啟用。
-- `target.instagram_user_id / facebook_page_id / username` 目前刻意留空，不能猜。
-- `timezone: Asia/Taipei`；暫定週二／四／六 20:00，每週 3 篇，`defaults_need_review: true`。
-- 預設最多輪播 10 張、每次 cron 最多 1 篇、逾時 24 小時停止待重排。
-- 每品牌有自己的 config、env 名稱、content、namespace、calendar、manifest、preflight 與 history；新入口對 maiocha 寫入命令停止，導向保留的原入口。
+## E. Account Verification
 
-發布頻率是明示的可修改樣板，不是演算法最佳時間。新品、貓咪與小知識沒有完整可驗證素材時會阻擋，不會為了輪替硬生成。
+**baobao 尚未通過真實帳號驗證。**config 的 Page ID、IG ID、username 保持 null，不能猜。
 
-## G. Image Grounding 流程
+已實作並測試的發布門檻：requested brand、config、專用 env、真實 Page→IG→username、caption／asset namespace、current content_id、完整性 hash、QA、人工批准、history、pause、schedule；任何不符即 DO_NOT_PUBLISH。建立容器後、真正 `media_publish` 前再核对帳號與 pause。
 
-每個資料夾獨立識別，metadata 七欄全可省略。先檢查圖片並保存不可覆寫的 original、來源 hash；完全相同照片去重，建立等比例 JPEG 1080×1350 與縮圖，不重畫、不改礦色或透明度。
+本次唯讀 maiocha 驗證仍正確：Page→IG 與 `maiocha.lab` 相符。未進行真實 baobao PREVIEW_PREFLIGHT／PUBLISH_PREFLIGHT，亦未測試發布。
 
-本機 Codex 分別讀取每件商品照片，逐張檢查清晰度、顏色可靠性、主體、構圖、全貌、細節、上手及封面適合度。保存使用者資料、可見色彩／光／表面／紋理、unknown fields、逐圖證據與選圖。透明感只是照片視覺描述。
+## F. Inbox workflow
 
-品質不足或多商品混淆時留下問題照片與補拍建議，狀態為 `NEEDS_INFO`。沒有礦名仍可繼續生成「這一串」，不靠照片鑑定礦種。來源變動会使舊核准及排程失效。
+一条商品一個 `content/baobao/inbox/{folder}/`，product.yaml 七欄全部選填。新增真實照片後，`prepare` 或「幫我處理這批寶寶礦照片」會批次處理；不會把提供照片當作批准。
 
-**實測範圍：**圖片處理與來源隔離已用合成 fixture 驗證；尚無真實商品可驗收 AI 看圖正確性。
+狀態為 `DRAFT → PREPARED → READY_FOR_REVIEW → 停止`。QA 不通過為 NEEDS_INFO。一次 20 組的隔離 fixture 測試通過，原照片保留、去重與縮圖測試通過；真實 10～30 組仍待你提供。
 
-## H. Caption Generation 流程
+## G. Grounding
 
-保存 grounding 後，才能建立 `caption_basis.json`，記錄主／次色、光、氛圍、使用者提供的礦種、候選／排除意境與理由。再產 A 商品貼合、B 意境、C 短句三版，保存選擇理由與 selected caption。
+先讀每一件商品實拍，保存獨立 product_grounding。包含使用者資料、主／次色、明暗、照片透明感、表面、紋理、對比、光、氣質、上手／平放／近拍／全貌與未知欄位，逐圖留 evidence。
 
-重要事實有來源 references：手動欄位、視覺 fact ID 或 basis 意境。不得用文風覆蓋商品，也不能在 hashtag 偷加礦名或功效。沒提供的售價、珠徑、產地、品質等級與療效不可補猜。
+保留原圖，不生成假商品、不改顏色或透明度。圖片處理與跨商品隔離已測試；**真實 AI 觀察品質尚未驗收**。
 
-使用已登入 ChatGPT 的 Codex CLI，僅在本機 prepare 執行。設有 ContentGenerator abstraction，拒絕 API key 模式；沒有啟用新的付費 API。GitHub 發布流程不呼叫 AI。實際 Codex CLI 的商品生成尚待照片驗收，單元測試使用假 provider，兩者沒有混稱。
+## H. Caption
 
-## I. Caption QA 流程
+Grounding 後建立 basis，保存意境候選、排除理由、user-provided facts 與 unknown facts，再產 A 商品貼合、B 意境、C 短句三版，依實物選定。沒有 metadata 不猜礦名、售價、珠徑、產地、處理、等級或功效。
 
-先做來源與規則檢查，再獨立重新讀圖，核對顏色、光、透明／表面、名字、價錢、珠徑、未標註斷言、意境、content_id、圖片一致性與「是否在寫這一條」；任何關鍵 FAIL 都不能 READY。
+本機 Codex 批次預生成，不新增付費 API；Actions 發布時不呼叫 AI。`revise <content_id> --instructions ...` 只重寫該篇 caption，保留 grounding／basis，不重新處理其他商品。**尚無真實商品 caption 可交付或聲稱內容品質已 PASS。**
 
-最多重新生成一次；仍失敗即 `NEEDS_INFO`。QA、caption、圖片、metadata、schedule、target 都被 hash 綁定。改 caption 需 `review-caption` 重新看圖 QA，保留使用者改後原文，重新核准才可安排。
+## I. Caption QA
 
-## J. Scheduler
+規則 QA 加獨立讀圖 QA，驗證顏色、光、透明／表面、意境、metadata 來源、礦種、價錢、珠徑、產地／療效斷言、content_id 及是否只適用眼前商品。失敗最多重新生成一次，仍失敗 NEEDS_INFO。
 
-先為 READY 商品建立可預覽日期；依色系、hook、結構、構圖與 SKU 最近使用狀況挑選，重跑保留既有日期。核准模式需明確 approve，schedule 才會 Hosting、線上 Preflight、寫入遠端正式 queue。
+錯色、未知礦種／價格、泛用文案、跨商品等攔截測試通過。沒有真實圖片時不把 fixture PASS 寫成真實 Caption QA PASS。
 
-queue 綁定精確 release hash，撤回／修改後舊發布包不能繼續使用。auto 模式省略人工 approve，仍須 QA、線上 Preflight 與真實首次測試。排程發布無即時 AI 依賴。
+## J. Carousel
 
-GitHub cron 每 15 分鐘檢查；平台可能延遲，不能保證精準到分鐘。超過 24 小時的項目停止，避免突然補發整批。[GitHub 官方限制](https://docs.github.com/en/actions/how-tos/troubleshoot-workflows)
+依清楚可用照片選 Single／Carousel，最多 10 張，不強制湊六張。保存封面與照片順序／photo_id。
 
-## K. Hosting
+`reorder <content_id> ...` 可只修改選圖或順序；不重寫 caption，重新圖片 QA，撤回舊批准。Single、Carousel 容器組合、順序修改及跨商品隔離測試通過。
 
-沿用 `https://edisonraywu.github.io/maiocha-media-host/`，寶寶礦限定 `/media/baobao/{content_id}/`。公開包僅含核准的選圖、正式 caption、manifest 與必要 QA 證明。
+## K. Preview、Hosting 與日曆
 
-Preflight 對每張做公開 GET、Content-Type、JPEG 格式、尺寸、大小、SHA256、brand namespace 與 manifest 一致性檢查。Meta 實際取圖能力仍需建立容器及第一篇實測才可確認；HTTP 200 不冒充 Meta 已取圖。
+Preview 已更新：Content ID、商品資料夾、封面、所有選圖與順序、Grounding、basis、A／B／C、Selected Caption、metadata、未知欄位、預計帳號、形式、狀態與建議日期。
 
-本次真實驗證的是原 maiocha 圖片：200、`image/jpeg`、SHA256 相符。baobao 尚無核准實物圖片可託管。
+本機 `content/baobao/preview/preview.html` 已重新產生，目前空 inbox。沒有用假照片生成可供發布的示範內容。
 
-## L. Meta API、帳號門檻與防重複
+日曆只給 `PROPOSED_SCHEDULE`，不能自行批准或寫正式 queue。PREVIEW_PREFLIGHT 唯讀檢查本機資料與 account；未公開 Hosting 時明確列 `PENDING_EXPLICIT_APPROVAL`。因 Pages 會把照片與文案公開，目前公開 Hosting 留到你明確批准後；使用同一 `/media/baobao/{content_id}/`，不偷用 maiocha asset。
 
-沿用原 App 和 Graph v26.0。每次發布核對 requested brand、config target、專用 env、Page→IG ID、實際 username、caption manifest 與 asset namespace。任一不符即 STOP，不會 fallback 到 maiocha credentials。
+批准後才完整 Hosting／公開 GET／MIME／hash／PUBLISH_PREFLIGHT。真正 Meta 取圖與一篇測試仍待授權、實物和明確同意。原 maiocha Hosting 本次回傳 200、image/jpeg、hash 相符。
 
-Single／Carousel 具備統一方法；Reel／Story 介面目前明確回報未啟用，沒有阻擋 Feed／Carousel。舊 maiocha 的影片／Story 程式保留。
+## L. Approval Gate
 
-GitHub journal 以 compare-and-swap 保證單一 owner，先保存 container intent／publish intent 才送請求。成功保存 content_id、Media ID、時間、target、asset／caption／source hash。已 PUBLISHED 自動拒絕，只有明確 `--force-republish` 才可再走全部門檻。
+**程式與測試 PASS。**已取消 baobao 自動核准路徑，`mode auto` 明確拒絕。`prepare`、`preview`、`calendar`、review preflight 都不會寫入 approval 或正式 queue。
 
-GET 只做有限重試；有副作用的 POST 不盲目重送。不確定是否成功、runner crash 或成功後寫回失敗均停止，透過實際 Media ID reconcile。FAILED 的明確可安全重試情況最多 2 次。
+只有明確 approve 指令會建立 `approval_state=APPROVED`、manual mode、時間、來源及涵蓋內容／照片／QA／日期／target 的指紋。直接呼叫 publisher、test publish、queue 或 journal claim 仍必須通過批准；重算 release hash 不能沿用被修改內容的舊批准。
 
-## M. GitHub Actions
+測試包含 DRAFT／PREPARED／READY_FOR_REVIEW／NEEDS_INFO 直接發布拒絕、auto flag 繞過拒絕、查看 Preview 不等於批准、修改單篇撤回批准。第一次 test publish 也不例外。
 
-已完成 CI 與 baobao cron workflow，品牌獨立 concurrency，失敗不呼叫或改動 maiocha。`workflow_dispatch` 預設 dry-run；PAUSE variable 與遠端 pause 均可擋發文。Actions 的 GITHUB_TOKEN 只用於同 repo 持久紀錄。
+## M. Pause 與防重複
 
-**部署尚未成功。**GitHub 拒絕既有 PAT 寫入 workflow。本機 commit 已保存；遠端 main 仍是本次開始的 `0d40846`。不 force push，不宣稱雲端排程已上線。
+遠端實際保持 paused=true，Actions artifact 確認已讀到。`PAUSE_ALL_BAOBAO_PUBLISHING` 環境變數／同名 Actions variable 及 journal pause 都保留。
 
-遠端 `automation-state/state/baobao.json` 已實際建立並透過 sync 讀回，保持暫停及未啟用。這不等於 workflow 已部署。
+程序中途 pause 阻止 `media_publish`、已發過不能重發、CAS 競爭、容器／發布逾時、runner crash、成功後紀錄失敗等測試通過。真實 publish history 目前空的。未批准內容無論 pause 是否解除都不能發。
 
-## N. Secrets：已有與還缺
+## N. maiocha regression
 
-| 狀態 | 項目 |
-|---|---|
-| 已有、本次唯讀可用 | maiocha 的專用環境設定、Page Token、IG／Page／username；原 Meta App Secret／User Token DPAPI；GitHub DPAPI credential |
-| 缺少本機 baobao 設定 | `BAOBAO_IG_USER_ID`、`BAOBAO_PAGE_ID`、`BAOBAO_IG_USERNAME`、`BAOBAO_PAGE_ACCESS_TOKEN` |
-| GitHub Secrets 內容尚不能確認 | 現有 PAT 缺 Secrets 讀取權，不能把「讀不到」宣稱為「沒有」；啟用前需確認上述四個品牌 Secret |
-| 平台自動提供 | Actions 的 `GITHUB_TOKEN`，不須手動建立 |
+**PASS，2026-09-26 14:52。**
 
-`.env`、DPAPI、原始商品與私人分析皆排除提交；錯誤只輸出安全代碼，不印 token 或 provider 原始錯誤。報告沒有 Secret 值。
+- 原有狀態機 **8／8 PASS**，在隔離複本執行。
+- **40 個原檔雜湊不變**，PowerShell 語法檢查沒有錯誤。
+- 真實 Page→IG→`maiocha.lab` 正確，原公開圖 200／JPEG／SHA256 相同。
+- 本次 Meta POST 0；不宣稱重新替 maiocha 發過貼文。
 
-## O. Dry Run 與回歸結果
+證據：`.local/maiocha-regression.json`。沒有修改原 maiocha publisher、config、內容、manifest 或 history。
 
-| 驗證 | 結果 |
-|---|---|
-| 新系統 unittest | **41／41 通過**；命令 `..\.venv-baobao\Scripts\python.exe -m unittest discover -s tests -v` |
-| 批次流程 | 隔離 fixture 一次 20 組、三候選、QA、日曆、Preview 通過；非真實商品成果 |
-| 重要阻擋 | A／B metadata、錯品牌／username／IG、錯色、未知礦名／價格／珠徑、hosting failure、missing token、錯 namespace 通過 |
-| 發布與 durable journal | carousel 組合、重複防止、CAS 衝突、lost response、publish timeout、runner crash、pause 中途、寫回失敗不重發通過 |
-| dry-run | fixture 完整發布路徑 0 POST；真實空 inbox CLI 回傳 `NO_DUE_CONTENT`／0 POST |
-| 真實 CLI | Windows 入口、status、prepare 空批次、preview、remote journal init／sync 已執行 |
-| Preview | 本機瀏覽器已實際開啟並看過截圖；目前顯示空 inbox，沒有捏造商品 |
-| maiocha 原檔 | **40 個雜湊相同**，PowerShell 語法檢查無錯 |
-| maiocha 原狀態機 | **8／8 通過**，在複本 fixture 執行，不修改正式 campaign state |
-| maiocha 真實唯讀查詢 | Page→IG 及 `maiocha.lab` 相符；回傳 media_count=0，不宣稱舊歷史貼文目前仍存在 |
-| maiocha 真實 Hosting | 公開圖片 200、JPEG MIME、SHA256 相同 |
+## O. baobao tests
 
-本機證據：`.local/maiocha-regression.json`、`.local/baobao-access-audit.json`、`.local/baobao-readiness.json`。新測試主要是受控假 Meta／GitHub transport；不等於 Instagram 實際 POST 成功。
+**57／57 PASS**（本機 Windows／Python 3.12），新版 GitHub Ubuntu CI 也成功。原 41 項保留其安全覆蓋，其中原 auto-mode 允許測試依新需求改為「不得自動核准」。新增覆蓋：
 
-## P. Test Publish
+- Prepare 必停在 review，不建立 queue／approval。
+- 未批准的正常與測試發布都在任何網路操作前停止。
+- 修改日期／內容不可沿用舊批准。
+- Preview 三版／順序／資料夾／target 完整。
+- 只改指定商品 caption；只調順序不重寫文案。
+- Secrets 使用 sealed box、只允許四個品牌名稱，不輸出值。
+- 同原 Meta App 接入；缺發布 permission 不寫 credentials。
+- Actions 診斷只輸出 Secret presence 與 pause，不輸出值。
 
-**尚未執行。**沒有 baobao 憑證及實物照片，不能冒用 maiocha、猜帳號或用測試 fixture 假裝實際商品發文。尚無寶寶礦 Media ID。
+fixture 使用合成圖片與假 Meta／GitHub transport，並非實際商品或真實 Instagram 發布驗收。真正線上證據另見 B／C／N。
 
-已實作一次單張 Feed 的測試模式、dry-run、Preflight、取得 Media ID、中文 caption 核對、baobao Media 列表確認、maiocha 不含該 Media ID 檢查，以及圖片人工／Codex 真實目視確認旗標。必須取得這些真實證據後，verify-test 才會設定 production_ready，並再次 pause，最後明確 resume 才進日常發布。
+## P. 還需本人完成什麼／下一個 checkpoint
 
-## Q. 還需要你本人完成什麼
+**現在只需要完成 Meta 授權：**
 
-1. **GitHub 權限：**開 [Fine-grained personal access tokens](https://github.com/settings/personal-access-tokens)，編輯原媒體託管 Token，僅限 `maiocha-media-host`，保留 Contents write 並增加 `Workflows: Read and write`。若讓程式代存 Secrets，增加 `Secrets: Read and write`；也可本人在 repo Settings → Secrets and variables → Actions 設四個品牌 Secret。不要把 Token 貼到對話。
-2. **Meta 本人授權：**開 [Graph API Explorer](https://developers.facebook.com/tools/explorer/)，選原 `MaiOcha Lab Automation`，Get User Access Token／Generate Access Token → 編輯資產權限，加入寶寶礦 Page 及已連結 IG、保留 maiocha；授予 `pages_show_list`、`pages_read_engagement`、`instagram_basic`、`instagram_content_publish`。複製 User Token 到 `tools/Connect-Baobao.ps1 -Username 實際IG帳號` 的隱藏輸入；程式核對並存專用 `.env`。不用重新連結 FB↔IG，不建新 App。
-3. **實物與帳號名稱：**提供寶寶礦確定的 @username，在 `content/baobao/inbox/2026-10-001/` 放一張真實清楚商品照，product.yaml 可不填。首次只測單圖一篇。
+1. 開 [Graph API Explorer](https://developers.facebook.com/tools/explorer/)，選 `MaiOcha Lab Automation`／App ID `1833218008099793`。
+2. Get Token → Get User Access Token／Generate Access Token，登入原 Facebook 身分。
+3. 在編輯資產存取權時選「寶寶礦到了」Page 及其已連結的實際 IG，保留 maiocha。
+4. 勾 `pages_show_list`、`pages_read_engagement`、`instagram_basic`、`instagram_content_publish`，Continue／Allow。
+5. 複製 User Access Token 到下列工具的隱藏輸入；不要貼聊天：
 
-以上不是重複請求一般操作核准：第一項是 GitHub 實際拒絕的 credential 權限，第二項是缺少該資產的 Meta 本人授權，第三項是無法代造的實物證據。補齊後可直接接續現有系統，無需重做架構。
+```powershell
+.\tools\Connect-Baobao.ps1 -Username 寶寶礦的實際IG帳號
+```
 
-權限更新後執行 `tools/Deploy-Baobao-Code.ps1` 推送已保存本機 commit。授權、照片到位後，依 [操作手冊第 11 節](baobao-automation.md#11-第一次只測一篇) 完成一篇實測及驗收。
+工具成功後，會安全存入 local `.env`，並直接加密設定前述四個 GitHub Secrets，不需要你逐一貼值。
 
-## R. 以後每次實際怎麼使用
+6. 回覆「Meta 授權已完成」並提供實際 @username（不是 Token）。接著我會做真實帳號與 Secrets／Actions 驗證，再請你提供第一組實物照片。
 
-系統正式驗收啟用後，每次：
+照片準備後先交付 READY_FOR_REVIEW Preview，等待你明確說「這篇可以測試發」。尚未完成 test publish、Media ID、實物圖片與中文驗證。即使成功，也維持人工核准模式。
 
-1. 一條實物一個 inbox 資料夾，可一次放 10～30 條；product.yaml 有資料才填。
-2. 在工作區執行 `baobao.cmd prepare`，逐條讀圖、grounding、basis、三候選、QA、選圖、日曆。
-3. 開 `content/baobao/preview/preview.html`，確認這篇確實在寫這一串。
-4. 執行 `baobao.cmd approve --all`，再 `baobao.cmd schedule --all`；後者會完成 Hosting、Preflight 與正式排程。
-5. 之後 GitHub 自動讀預生成內容發布。執行 `baobao.cmd sync` 同步 Media ID／history／本機歸檔；雲端 journal 已在發布時保存。
-6. 隨時 `baobao.cmd pause` 暫停，`resume` 恢復；穩定後 `mode auto` 才省略人工核准。
+平常操作只需看 [「平常我到底要怎麼用」](baobao-automation.md#平常我到底要怎麼用)。
 
-修改文案、日期、取消、立即發布、失敗處理、Token 更新、approval／auto 全部步驟見 [非工程師操作手冊](baobao-automation.md)。
+**READY_FOR_PHOTO_ONLY_WORKFLOW = NO**
 
-**READY_FOR_BAOBAO_AUTOMATION = NO** — 在上述三項 blocker 與一篇真實測試解決前維持暫停。
+**READY_FOR_BAOBAO_AUTOMATION = NO**
