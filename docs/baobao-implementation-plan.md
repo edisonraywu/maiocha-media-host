@@ -12,6 +12,8 @@ Meta、四個 Secrets、真實帳號與雲端 GET 驗證已完成（5188ba8；CI
 6. 增加 7/14 商品 × 6 圖、身分／hash／日期／部分批准／不重新生成／暫停等測試，再跑完整 CI、原有 8 項與 40 原檔回歸。
 7. 更新每週操作與收件模板，部署程式、驗證唯讀雲端結果。新的 Batch readiness 僅表示收件工程完成；實物品質與首篇批准測試留待收到照片後，production 保持暫停。
 
+本次完成紀錄：Batch 程式已部署為 5a27482；95 項測試 PASS、原有 maiocha 8 項 PASS、40 原檔未變。CI 36238952629、Pages 36238952389、手動 Dry Run 36238971349 均 PASS；四個 Secrets 與 babycrystal.tw 真實帳號已在雲端再次驗證，POST=0、paused=true。只有一次性的 default_publish_time 尚待使用者回答（已提出問題，不自行採用樣板）。以下保留最初架構稽核歷史，最新狀態以 acceptance report 為準。
+
 稽核日期：2026-09-26。此計畫在修改任何既有程式前建立。
 
 ## 已確認的現況

@@ -6,13 +6,13 @@
 
 `WAITING_FOR_BATCH_PHOTOS = NO`
 
-目前 checkpoint：DEPLOY_AND_CI_VERIFICATION_PENDING, DEFAULT_PUBLISH_TIME_OWNER_CONFIRMATION。每日預設時間：待使用者回覆一次性時間問題；未把20:00樣板當成批准。
+目前 checkpoint：DEFAULT_PUBLISH_TIME_OWNER_CONFIRMATION。每日預設時間：待使用者回覆一次性時間問題；未把20:00樣板當成批准。
 
 | 驗收項目 | 結果與證據 |
 |---|---|
-| A. GitHub | 既有部署 PASS；本次更新待部署；基準 d392bb55d0d64995904c020fdd32589850f491c3；未回滾 commits |
-| B. Actions / CI | 待本次部署驗證 |
-| C. Pages | 待本次部署驗證；沿用 maiocha-media-host |
+| A. GitHub | PASS，本次程式已部署；基準 5a2748207dfda8d052143c73363f5b47bd063d12；未回滾 commits |
+| B. Actions / CI | https://github.com/edisonraywu/maiocha-media-host/actions/runs/36238952629 |
+| C. Pages | https://github.com/edisonraywu/maiocha-media-host/actions/runs/36238952389；沿用 maiocha-media-host |
 | D. Meta authorization | PASS；沿用 MaiOcha Lab Automation / 1833218008099793、Facebook Login、v26.0 |
 | E. Secrets | PASS；BAOBAO_PAGE_ID、BAOBAO_IG_USER_ID、BAOBAO_IG_USERNAME、BAOBAO_PAGE_ACCESS_TOKEN 已存在；只驗證存在，不輸出值 |
 | F. Account Verification | PASS；日常收藏所 / Page 1348149615047101 → IG 17841431857348052 → babycrystal.tw；真實 API 關聯與專用帳號核對 |
@@ -31,7 +31,7 @@
 | S. Pause / Duplicate | PASS；journal pause及環境pause均攔截；成功記Media ID與hash，禁止自動重發；目前真實journal paused=true、production_ready=false、queue=0、items=0 |
 | T. baobao Tests | 95 項本機測試 PASS；隔離fixtures／fake Meta，沒有真實商品發布 |
 | U. maiocha Regression | 8 項原有測試 PASS；40個原檔0變更；沒有改maiocha帳號、素材或workflow |
-| V. Cloud Dry Run | 待本次部署驗證；專用 Secrets、live account、pause 只讀驗證，Instagram POST=0 |
+| V. Cloud Dry Run | https://github.com/edisonraywu/maiocha-media-host/actions/runs/36238971349；專用 Secrets、live account、pause 只讀驗證，Instagram POST=0 |
 
 ## 真實資料與工程 fixtures 的界線
 
@@ -47,6 +47,6 @@
 
 ## 剩餘一次性操作
 
-DEPLOY_AND_CI_VERIFICATION_PENDING；DEFAULT_PUBLISH_TIME_OWNER_CONFIRMATION
+DEFAULT_PUBLISH_TIME_OWNER_CONFIRMATION
 
 舊的完整實物上線標準仍為 `READY_FOR_PHOTO_ONLY_WORKFLOW = NO` / `READY_FOR_BAOBAO_AUTOMATION = NO`，直到真實商品經審核、明確批准並完成一篇test publish。新的 Batch readiness 只描述照片到待審核的工程已備妥，不授權任何自動發文。
