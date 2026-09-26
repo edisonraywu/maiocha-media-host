@@ -264,11 +264,12 @@ def main():
         reports = result if isinstance(result, list) else [result]
         return 2 if any(isinstance(x, dict) and x.get('result') in ('FAIL', 'MANUAL_ACTION_REQUIRED') for x in reports) else 0
     except Blocked as error:
-        print(json.dumps({'status': 'MANUAL_ACTION_REQUIRED' if error.manual else 'FAIL', 'code': error.code, 'published': False}, ensure_ascii=False))
+        print(json.dumps({'status': 'MANUAL_ACTION_REQUIRED' if error.manual else 'FAIL', 'code': error.code,
+                          'publication_outcome': 'NOT_CONFIRMED', 'do_not_retry_automatically': True}, ensure_ascii=False))
         return 2
     except Exception:
         # No unfiltered traceback can leak credentials or provider response bodies.
-        print(json.dumps({'status': 'FAIL', 'code': 'UNEXPECTED_LOCAL_ERROR', 'published': False}))
+        print(json.dumps({'status': 'FAIL', 'code': 'UNEXPECTED_LOCAL_ERROR', 'publication_outcome': 'NOT_CONFIRMED', 'do_not_retry_automatically': True}))
         return 3
 
 

@@ -366,7 +366,44 @@ class PipelineTests(unittest.TestCase):
         with self.assertRaisesRegex(Blocked, 'APPROVAL_MISSING_OR_STALE'):
             build_release(self.content, item, self.config)
 
+    def test_corrupt_colour_profile_reports_image_problem(self):
+        folder = self.product()
+        image = Image.new('RGB', (800, 1000), 'blue')
+        image.save(folder / '00.jpg', icc_profile=b'not-an-icc-profile')
+        item = ingest_one(self.content, folder, 'baobao')
+        self.assertEqual(item['status'], 'NEEDS_INFO')
+        self.assertTrue(any(x['code'] == 'UNREADABLE_IMAGE' for x in item['issues']))
+
+    def test_successful_publish_with_journal_write_failure_cannot_repeat(self):
+        _, pack = self.release()
+        original_write = self.state.write
+        failed = []
+        def broken_final_write(state, sha):
+            if not failed and any(x['status'] == 'PUBLISHED' for x in state['items'].values()):
+                failed.append(True)
+                raise Blocked('JOURNAL_WRITE_UNCONFIRMED', manual=True)
+            return original_write(state, sha)
+        self.state.write = broken_final_write
+        meta = FakeMeta()
+        with self.assertRaises(Blocked):
+            self.publisher(meta).publish(pack)
+        self.assertEqual(sum(e == 'media_publish' for e, _ in meta.posts), 1)
+        with self.assertRaises(Blocked):
+            self.publisher(meta).publish(pack)
+        self.assertEqual(sum(e == 'media_publish' for e, _ in meta.posts), 1)
+
+    def test_runner_crash_after_container_intent_blocks_next_run(self):
+        _, pack = self.release()
+        def crash():
+            raise SystemExit(99)
+        meta = FakeMeta(after_create=crash)
+        with self.assertRaises(SystemExit):
+            self.publisher(meta).publish(pack)
+        self.assertEqual(self.state.state['items'][pack['content_id']]['status'], 'PUBLISHING')
+        with self.assertRaises(Blocked):
+            self.publisher(meta).publish(pack)
+        self.assertEqual(len(meta.posts), 1)
+
 
 if __name__ == '__main__':
     unittest.main()
-

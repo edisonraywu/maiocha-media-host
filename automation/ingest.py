@@ -128,7 +128,7 @@ def ingest_one(content: Path, folder: Path, brand: str) -> dict:
                             'processed_path': processed.relative_to(dest).as_posix(),
                             'thumbnail_path': thumb.relative_to(dest).as_posix(),
                             'processed_sha256': file_hash(processed), **facts})
-        except (OSError, ValueError, Image.DecompressionBombWarning, Image.DecompressionBombError):
+        except (OSError, ValueError, ImageCms.PyCMSError, Image.DecompressionBombWarning, Image.DecompressionBombError):
             issues.append({'file': photo.name, 'code': 'UNREADABLE_IMAGE', 'action': '請補一張清楚的 JPEG/PNG；HEIC 請先匯出 JPEG。'})
     if not records:
         issues.append({'file': folder.name, 'code': 'NO_USABLE_PHOTOS', 'action': '每條商品資料夾至少放一張實際商品照片。'})
@@ -154,4 +154,3 @@ def ingest(content: Path, brand: str) -> list[dict]:
             results.append({'brand': brand, 'source_folder': folder.name, 'status': 'NEEDS_INFO', 'error': error.code})
     save_json(content / 'ingest-report.json', {'checked_at': now(), 'items': results})
     return results
-

@@ -205,6 +205,12 @@ GitHub Actions 需要在同一 repository 的 Secrets 存這四個名稱，值�
 
 `GITHUB_TOKEN` 由 Actions 自動提供，不要手動建立它。若目前 GitHub PAT 沒有 Secrets／Workflows 管理權限，需以你的 GitHub 設定頁完成或提高該既有 credential 的對應權限。
 
+本次實際稽核：既有 credential 是 **fine-grained PAT**，缺少 workflow 寫入與 Secrets 讀取權限。開啟 [Fine-grained personal access tokens](https://github.com/settings/personal-access-tokens)，編輯原本媒體託管使用的 Token，維持只選 `maiocha-media-host`，在 Repository permissions 補 `Workflows: Read and write`。若要讓程式代存品牌 Secrets，再補 `Secrets: Read and write`。不要擴成所有 repository，也不需要建立另一個 Meta App。
+
+GitHub 官方列出的 [fine-grained 權限對照](https://docs.github.com/en/rest/authentication/permissions-required-for-fine-grained-personal-access-tokens) 將 workflow 檔案更新及 Actions Secrets 分別列為 Workflows、Secrets 權限。原本的 Token 直接更新權限即可，無需把 Token 貼到聊天。
+
+權限完成後，重新執行 `.\tools\Deploy-Baobao-Code.ps1` 即可推送本機已保存的程式；不會 force push，也不會自動開啟 production。
+
 ## 11. 第一次只測一篇
 
 選一條實際商品，只放一張清楚照片，完成 prepare 與 preview 核准後：
