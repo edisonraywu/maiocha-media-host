@@ -7,6 +7,8 @@ from .core import (Blocked, PRODUCT_FIELDS, atomic_bytes, digest, file_hash, ins
 from .ingest import ingest, source_snapshot
 from .qa import grounding_errors, qa_report, validate
 
+PROVENANCE = ('brand', 'source_folder', 'user_provided', 'unknown_fields', 'user_declared_facts')
+
 
 def assert_current(content: Path, item: dict) -> None:
     source = inside(content, item['source_folder'])
@@ -18,6 +20,8 @@ def assert_current(content: Path, item: dict) -> None:
         raise Blocked('SOURCE_FOLDER_MISSING')
     folder = item_dir(content, item['content_id'])
     for photo in item['photos']:
+        if photo.get('content_id') != item['content_id'] or photo.get('asset_id') != item['content_id'] + '-' + photo['source_sha256'][:24]:
+            raise Blocked('CROSS_PRODUCT_ASSET_BINDING')
         if file_hash(inside(folder, photo['original_path'])) != photo['source_sha256']:
             raise Blocked('ORIGINAL_CHANGED')
         if file_hash(inside(folder, photo['processed_path'])) != photo['processed_sha256']:
@@ -55,18 +59,22 @@ def prepare_one(content: Path, item: dict, config: dict, generator, recent: list
         # User metadata and provenance are inserted by code, never accepted from AI.
         grounding.update({'brand': item['brand'], 'source_folder': item['source_folder'],
                           'user_provided': item['user_provided'],
+                          'user_declared_facts': dict(item['user_provided'], **item.get('declared_schedule', {})),
                           'unknown_fields': [f for f in PRODUCT_FIELDS if item['user_provided'].get(f) is None]})
         save_json(folder / 'product_grounding.json', grounding)
+        if not str(item['user_provided'].get('crystal_name') or '').strip():
+            errors.append('USER_CRYSTAL_NAME_REQUIRED')
         if errors:
             item['status'], item['prepare_errors'] = 'NEEDS_INFO', errors
             item['photo_issues'] = grounding['issues']
             save_json(folder / 'item.json', item)
             return item
         # Strict schema QA validates the original model view without the provenance fields added above.
-        model_grounding = {k: v for k, v in grounding.items() if k not in ('brand', 'source_folder', 'user_provided', 'unknown_fields')}
+        model_grounding = {k: v for k, v in grounding.items() if k not in PROVENANCE}
         basis = generator.generate('basis', {**base, 'grounding': grounding}, images, work / 'basis')
         validate('basis', basis, item)
         basis['user_provided_facts'] = [{'field': k, 'value': str(v)} for k, v in item['user_provided'].items() if v is not None]
+        basis['user_provided_facts'] += [{'field': k, 'value': str(v)} for k, v in item.get('declared_schedule', {}).items() if v is not None]
         basis['unknown_facts'] = list(grounding['unknown_fields'])
         save_json(folder / 'caption_basis.json', basis)
         item.update(status='PREPARED', approval=None, approval_state='PENDING')
@@ -93,6 +101,9 @@ def prepare_one(content: Path, item: dict, config: dict, generator, recent: list
             save_json(folder / 'caption_qa.json', report)
             atomic_bytes(folder / 'selected_caption.txt', selected['caption'].encode('utf-8'))
             if report['result'] == 'PASS':
+                if item.get('batch_id'):
+                    from .batch import assert_batch_binding
+                    assert_batch_binding(content, item)
                 item.update({'status': 'READY_FOR_REVIEW', 'content_type': 'SINGLE' if len(grounding['selected_photo_ids']) == 1 else 'CAROUSEL',
                              'selected_photo_ids': grounding['selected_photo_ids'], 'content_style': basis['content_style'],
                              'cover_composition': next(p['composition'] for p in grounding['photo_reviews'] if p['photo_id'] == grounding['selected_photo_ids'][0]),
@@ -114,6 +125,11 @@ def prepare_one(content: Path, item: dict, config: dict, generator, recent: list
 
 
 def check_prepared(content: Path, item: dict) -> dict:
+    if not str(item['user_provided'].get('crystal_name') or '').strip():
+        raise Blocked('USER_CRYSTAL_NAME_REQUIRED')
+    if item.get('batch_id'):
+        from .batch import assert_batch_binding
+        assert_batch_binding(content, item)
     assert_current(content, item)
     folder = item_dir(content, item['content_id'])
     grounding = read_json(folder / 'product_grounding.json')
@@ -125,7 +141,7 @@ def check_prepared(content: Path, item: dict) -> dict:
         raise Blocked('PREPARATION_INCOMPLETE')
     if grounding.get('brand') != item['brand'] or grounding.get('user_provided') != item['user_provided']:
         raise Blocked('GROUNDING_PRODUCT_MISMATCH')
-    subset = {k: v for k, v in grounding.items() if k not in ('brand', 'source_folder', 'user_provided', 'unknown_fields')}
+    subset = {k: v for k, v in grounding.items() if k not in PROVENANCE}
     rerun = qa_report(item, subset, basis, captions, vision)
     rerun['grounding_hash'] = digest(grounding)
     if rerun != report or report['result'] != 'PASS' or digest(report) != item.get('qa_hash'):
@@ -194,7 +210,7 @@ def review_caption(content: Path, item: dict, config: dict, generator):
     from .core import text_hash
     vision = generator.generate('qa', dict(base, caption=manual, caption_hash=text_hash(manual),
                                 selected_photo_ids=grounding['selected_photo_ids']), images, folder / 'generation' / 'manual-qa')
-    subset = {k: v for k, v in grounding.items() if k not in ('brand', 'source_folder', 'user_provided', 'unknown_fields')}
+    subset = {k: v for k, v in grounding.items() if k not in PROVENANCE}
     report = qa_report(item, subset, basis, captions, vision)
     report['grounding_hash'] = digest(grounding)
     save_json(folder / 'caption_candidates.json', captions)
@@ -207,7 +223,8 @@ def review_caption(content: Path, item: dict, config: dict, generator):
     return item
 
 
-def revise_one(content: Path, item: dict, config: dict, generator, *, instructions: str = '', photo_ids: list[str] | None = None):
+def revise_one(content: Path, item: dict, config: dict, generator, *, instructions: str = '', photo_ids: list[str] | None = None,
+               selected_key: str | None = None):
     """Revise only this item; keep its original grounding/basis and every other product untouched."""
     if item['status'] in ('PUBLISHED', 'PUBLISHING', 'MANUAL_ACTION_REQUIRED', 'CANCELLED'):
         raise Blocked('IMMUTABLE_OR_UNCERTAIN_PRODUCT')
@@ -222,6 +239,12 @@ def revise_one(content: Path, item: dict, config: dict, generator, *, instructio
         if not photo_ids or len(photo_ids) > 10 or len(set(photo_ids)) != len(photo_ids) or not set(photo_ids) <= valid:
             raise Blocked('INVALID_REVIEW_PHOTO_SELECTION')
         grounding['selected_photo_ids'] = photo_ids
+        for photo in grounding['photo_reviews']:
+            if photo['photo_id'] in photo_ids:
+                photo['selection_reason'] = '依使用者指定順序：第 ' + str(photo_ids.index(photo['photo_id']) + 1) + ' 張。'
+            elif not photo['issues']:
+                photo['issues'] = ['使用者指定不使用此張。']
+                photo['selection_reason'] = '使用者指定不使用此張。'
         save_json(folder / 'product_grounding.json', grounding)
     item.update(status='PREPARED', approval=None, approval_state='PENDING')
     save_json(folder / 'item.json', item)
@@ -229,12 +252,17 @@ def revise_one(content: Path, item: dict, config: dict, generator, *, instructio
     base = {'content_id': item['content_id'], 'input_hash': item['input_hash'], 'user_provided': item['user_provided'],
             'photo_ids': [p['photo_id'] for p in item['photos']], 'grounding': grounding,
             'caption_basis': basis, 'brand_voice': config['brand_voice'], 'user_revision_request': instructions}
-    subset = {k: v for k, v in grounding.items() if k not in ('brand', 'source_folder', 'user_provided', 'unknown_fields')}
+    subset = {k: v for k, v in grounding.items() if k not in PROVENANCE}
     previous_errors = []
     try:
         for attempt in range(2 if instructions else 1):
             captions = (generator.generate('captions', dict(base, fix_errors=previous_errors), images, folder / 'generation' / f'revision-{attempt}')
                         if instructions else read_json(folder / 'caption_candidates.json'))
+            if selected_key is not None:
+                if selected_key not in ('A', 'B', 'C'):
+                    raise Blocked('INVALID_CAPTION_SELECTION')
+                captions['selected_key'] = selected_key
+                captions['selection_reason'] = '使用者指定文案 ' + selected_key + '；重新圖片 QA 後等待明確批准。'
             validate('captions', captions, item)
             chosen = next(x for x in captions['candidates'] if x['key'] == captions['selected_key'])
             from .core import text_hash

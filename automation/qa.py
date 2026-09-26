@@ -10,7 +10,7 @@ from .schemas import SCHEMAS, QA_KEYS
 MINERALS = ('海藍寶', '綠碧璽', '碧璽', '紫水晶', '超七', '拉利瑪', '月光石', '太陽石', '拉長石',
             '螢石', '粉晶', '白水晶', '黃水晶', '茶晶', '黑曜石', '虎眼石', '草莓晶', '鈦晶',
             '髮晶', '髮水晶', '天河石', '石榴石', '摩根石', '舒俱徠', '翡翠', '和田玉', '孔雀石',
-            '橄欖石', '托帕石', '青金石', '藍晶石', '紅紋石', '磷灰石', '綠幽靈', '幽靈水晶')
+            '橄欖石', '托帕石', '青金石', '藍晶石', '紅紋石', '磷灰石', '綠幽靈', '幽靈水晶', '黑銀鈦')
 UNSUPPORTED = ('收藏級', '頂級', '極稀有', '高冰', '無瑕', '晶體超乾淨', '5A', '天然無處理',
                '無燒', '無染', '無注膠', '招財保證', '開運保證', '治療', '醫療', '療效', '改善失眠',
                '招財', '轉運', '保證開運', '保證招財', '證書', '產地', '礦區', '市場價值')
@@ -44,6 +44,14 @@ def grounding_errors(grounding: dict, item: dict) -> list[str]:
         p = review_map.get(key, {})
         if not p.get('usable') or not p.get('colour_reliable') or not p.get('same_product') or p.get('product_count') != 1:
             errors.append('SELECTED_PHOTO_UNRELIABLE:' + key)
+    for review in reviews:
+        if not review['selection_reason'].strip():
+            errors.append('PHOTO_REASON_REQUIRED:' + review['photo_id'])
+        if review['photo_id'] not in selected and not review['issues']:
+            errors.append('EXCLUSION_REASON_REQUIRED:' + review['photo_id'])
+        similar = review['similar_to_photo_id']
+        if similar and (similar not in ids or similar == review['photo_id']):
+            errors.append('INVALID_SIMILAR_PHOTO_REFERENCE')
     # Contradictory identities cannot be hidden merely by dropping the other product from a carousel.
     if any(not p['same_product'] or p['product_count'] > 1 for p in reviews):
         errors.append('PRODUCT_IDENTITY_AMBIGUOUS')
@@ -68,9 +76,13 @@ def caption_errors(caption: str, item: dict, grounding: dict, basis: dict, candi
         errors.append('TOO_MANY_HASHTAGS')
     provided = item['user_provided']
     supplied_name = str(provided.get('crystal_name') or '')
+    if not supplied_name.strip():
+        errors.append('USER_CRYSTAL_NAME_REQUIRED')
+    elif supplied_name not in caption:
+        errors.append('DECLARED_CRYSTAL_NAME_MISSING')
     # Mineral nouns must be explicitly supplied, never inferred from the image.
     for name in MINERALS:
-        if name in caption and name not in supplied_name and name not in str(provided.get('product_name') or ''):
+        if name in caption and name not in supplied_name:
             errors.append('UNPROVIDED_MINERAL:' + name)
     provided_text = ' '.join(str(provided.get(k) or '') for k in ('product_name', 'crystal_name', 'notes'))
     for phrase in UNSUPPORTED:
@@ -147,7 +159,9 @@ def qa_report(item: dict, grounding: dict, basis: dict, captions: dict, vision: 
     if chosen is None:
         raise Blocked('SELECTED_CAPTION_MISSING')
     caption = chosen['caption']
-    errors += caption_errors(caption, item, grounding, basis, chosen)
+    # All three visible candidates must obey the same product facts, including unselected alternatives.
+    for candidate in candidates:
+        errors += caption_errors(candidate['caption'], item, grounding, basis, candidate)
     if not set(basis['dominant_color']) == set(grounding['visual_observations']['dominant_colors']):
         errors.append('BASIS_COLOUR_MISMATCH')
     if not basis['evidence_fact_ids'] or not set(basis['evidence_fact_ids']) <= {f['fact_id'] for f in grounding['facts']}:
@@ -166,4 +180,3 @@ def qa_report(item: dict, grounding: dict, basis: dict, captions: dict, vision: 
             'checks': vision['checks'], 'caption_hash': text_hash(caption),
             'grounding_hash': digest(grounding), 'basis_hash': digest(basis), 'candidates_hash': digest(captions),
             'vision_qa_hash': digest(vision), 'selected_photo_ids': grounding['selected_photo_ids']}
-

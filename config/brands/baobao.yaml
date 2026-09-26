@@ -19,6 +19,7 @@ auto_publish_without_approval: false
 paused: true
 posting:
   timezone: Asia/Taipei
+  default_publish_time: null  # 一次性詢問已提出；由使用者確認後保存，不沿用未確認的樣板。
   posting_days:
   - 1
   - 3

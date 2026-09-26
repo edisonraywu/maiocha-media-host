@@ -66,6 +66,32 @@ def parser():
     rec.add_argument('--media-id', required=True)
     retry = sub.add_parser('retry')
     retry.add_argument('content_id')
+    batch = sub.add_parser('batch')
+    commands = batch.add_subparsers(dest='batch_command', required=True)
+    intake = commands.add_parser('intake')
+    intake.add_argument('--input', type=Path, required=True, help='使用者自然語言清單，不是 YAML')
+    intake.add_argument('--source', type=Path, required=True, help='照片群組目錄，每個商品代號一個資料夾')
+    intake.add_argument('--batch-id')
+    intake.add_argument('--year', type=int)
+    for name in ('prepare', 'preview', 'status'):
+        commands.add_parser(name).add_argument('batch_id')
+    update = commands.add_parser('update')
+    update.add_argument('batch_id')
+    update.add_argument('product_ref')
+    from .core import PRODUCT_FIELDS
+    for key in (*PRODUCT_FIELDS, 'publish_date', 'publish_time'):
+        update.add_argument('--' + key.replace('_', '-'))
+    attach = commands.add_parser('add-photos')
+    attach.add_argument('batch_id')
+    attach.add_argument('product_ref')
+    attach.add_argument('--source', type=Path, required=True)
+    ranged = sub.add_parser('approve-range')
+    ranged.add_argument('batch_id')
+    ranged.add_argument('start', help='YYYY-MM-DD')
+    ranged.add_argument('end', help='YYYY-MM-DD')
+    choose = sub.add_parser('select-caption')
+    choose.add_argument('content_id')
+    choose.add_argument('key', choices=['A', 'B', 'C'])
     return p
 
 
@@ -82,11 +108,13 @@ def run(args):
     def journal():
         return GitHubJournal(config)
     def item(cid):
-        result = read_json(item_dir(content, cid) / 'item.json')
+        from .batch import resolve_item
+        result = resolve_item(content, cid)
         if not result or result.get('brand') != args.brand:
             raise Blocked('ITEM_NOT_FOUND_OR_WRONG_BRAND')
         return result
     def release(cid):
+        cid = item(cid)['content_id']
         data = read_json(repo / 'releases' / args.brand / valid_id(cid) / 'release.json')
         if not data:
             raise Blocked('STAGE_AND_HOST_FIRST')
@@ -122,6 +150,61 @@ def run(args):
         result = sync_secrets(config)
         save_json(content / 'github-secret-verification.json', result)
         return result
+    if command == 'batch':
+        from .batch import add_photos, intake_batch, prepare_batch, refresh_batch, update_product
+        if args.batch_command == 'intake':
+            from .core import local_lock
+            with local_lock(content):
+                result = intake_batch(content, config, args.input.read_text(encoding='utf-8-sig'), args.source,
+                                      batch_id=args.batch_id, year=args.year)
+            render_preview(content, config)
+            return result
+        if args.batch_command in ('update', 'add-photos'):
+            from .core import PRODUCT_FIELDS
+            batch = refresh_batch(content, args.batch_id)
+            product = next((p for p in batch['products'] if p['product_ref'] == args.product_ref), None)
+            if not product:
+                raise Blocked('PRODUCT_REFERENCE_NOT_FOUND')
+            old = read_json(item_dir(content, product['content_id']) / 'item.json')
+            if old and old.get('release_hash'):
+                revoke_scheduled(journal(), old['content_id'])
+                old.pop('release_hash', None)
+                old.update(approval=None, approval_state='PENDING', status='DRAFT')
+                save_json(item_dir(content, old['content_id']) / 'item.json', old)
+            if args.batch_command == 'update':
+                changes = {k: getattr(args, k) for k in (*PRODUCT_FIELDS, 'publish_date', 'publish_time') if getattr(args, k) is not None}
+                result = update_product(content, config, args.batch_id, args.product_ref, changes)
+            else:
+                result = add_photos(content, config, args.batch_id, args.product_ref, args.source)
+            render_preview(content, config)
+            return {'content_id': result['content_id'], 'status': result['status'], 'approval_granted': False}
+        if args.batch_command == 'prepare':
+            batch = refresh_batch(content, args.batch_id)
+            for product in batch['products']:
+                old = read_json(item_dir(content, product['content_id']) / 'item.json')
+                if old and old.get('release_hash'):
+                    try:
+                        check_prepared(content, old)
+                    except Blocked:
+                        revoke_scheduled(journal(), old['content_id'])
+                        old.pop('release_hash', None)
+                        old.update(approval=None, approval_state='PENDING', status='DRAFT')
+                        save_json(item_dir(content, old['content_id']) / 'item.json', old)
+            results = prepare_batch(content, config, args.batch_id, lambda: CodexBatchGenerator(config['generator']['timeout_seconds']))
+            reports = [preview_preflight(repo, content, x, config) for x in results if x['status'] == 'READY_FOR_REVIEW']
+            path = render_preview(content, config)
+            return {'batch_id': args.batch_id, 'items': [{k: x.get(k) for k in ('content_id', 'status', 'prepare_errors')} for x in results],
+                    'preview': str(path), 'preview_preflight': reports, 'approval_granted': False, 'api_post_requests_sent': 0}
+        result = refresh_batch(content, args.batch_id)
+        if args.batch_command == 'preview':
+            result['preview'] = str(render_preview(content, config))
+        return result
+    if command == 'approve-range':
+        from .batch import approve_range
+        results = approve_range(content, config, args.batch_id, args.start, args.end)
+        render_preview(content, config)
+        return {'approved_ids': [x['content_id'] for x in results], 'scheduled': False,
+                'note': '只有指定日期範圍已批准；暫停與首篇測試門檻仍由 schedule 檢查。'}
     if command == 'ingest':
         result = ingest(content, args.brand)
         render_preview(content, config)
@@ -178,6 +261,8 @@ def run(args):
         return [{'content_id': x['content_id'], 'status': x['status']} for x in results]
     if command == 'reschedule':
         data = item(args.content_id)
+        if data.get('batch_id'):
+            raise Blocked('USE_BATCH_UPDATE_TO_PRESERVE_DECLARED_DATE_BINDING')
         if data['status'] in ('PUBLISHED', 'PUBLISHING', 'MANUAL_ACTION_REQUIRED'):
             raise Blocked('CANNOT_RESCHEDULE_PUBLISHED_OR_UNCERTAIN')
         parse_time(args.publish_at)
@@ -210,14 +295,15 @@ def run(args):
         result = review_caption(content, data, config, CodexBatchGenerator(config['generator']['timeout_seconds']))
         render_preview(content, config)
         return {'content_id': data['content_id'], 'status': result['status'], 'errors': result.get('prepare_errors')}
-    if command in ('revise', 'reorder'):
+    if command in ('revise', 'reorder', 'select-caption'):
         from .pipeline import revise_one
         data = item(args.content_id)
         if data.get('release_hash'):
             revoke_scheduled(journal(), data['content_id'])
         result = revise_one(content, data, config, CodexBatchGenerator(config['generator']['timeout_seconds']),
                             instructions=args.instructions if command == 'revise' else '',
-                            photo_ids=args.photo_ids if command == 'reorder' else None)
+                            photo_ids=args.photo_ids if command == 'reorder' else None,
+                            selected_key=args.key if command == 'select-caption' else None)
         if result['status'] == 'READY_FOR_REVIEW':
             preview_preflight(repo, content, result, config)
         render_preview(content, config)

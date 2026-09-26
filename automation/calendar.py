@@ -47,7 +47,7 @@ def plan_calendar(content: Path, config: dict, start: datetime | None = None):
     scheduled = [x for x in items if x.get('publish_at') and x['status'] != 'CANCELLED']
     occupied = {parse_time(x['publish_at']).astimezone(zone) for x in scheduled}
     counts = Counter((t.isocalendar().year, t.isocalendar().week) for t in occupied)
-    pending = [x for x in items if not x.get('publish_at') and x['status'] == 'READY_FOR_REVIEW']
+    pending = [x for x in items if not x.get('publish_at') and x['status'] == 'READY_FOR_REVIEW' and not x.get('batch_id')]
     history = sorted(scheduled, key=lambda x: x['publish_at'])[-5:]
     def penalty(item):
         score = 0

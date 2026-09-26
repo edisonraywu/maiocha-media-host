@@ -22,8 +22,11 @@ def approve(content: Path, item: dict, config: dict):
     if item['status'] not in ('READY_FOR_REVIEW', 'APPROVED', 'SCHEDULED'):
         raise Blocked('ITEM_NOT_READY')
     check_prepared(content, item)
-    if not item.get('publish_at'):
-        raise Blocked('SET_CALENDAR_FIRST')
+    # A date-less item may be approved, but build_release still requires a date.
+    # Adding/changing a date invalidates this approval and returns it for review.
+    if item.get('batch_id'):
+        from .batch import assert_batch_binding
+        assert_batch_binding(content, item)
     if not all(config['target'].values()):
         raise Blocked('TARGET_NOT_PINNED', manual=True)
     if (item.get('approval') or {}).get('mode') == 'manual' and item.get('approval_state') == 'APPROVED' and item['approval'].get('state') == 'APPROVED' and item['approval'].get('source') == 'explicit_approval_command' and item['approval'].get('fingerprint') == approval_fingerprint(item, config):

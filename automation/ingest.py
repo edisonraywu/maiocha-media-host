@@ -44,7 +44,8 @@ def source_snapshot(folder: Path) -> tuple[list[Path], dict, str]:
         if p.stat().st_size > 60_000_000:
             raise Blocked('SOURCE_PHOTO_TOO_LARGE')
     data = metadata(folder)
-    fingerprint = digest({'metadata': data, 'photos': [{'name': p.name, 'sha256': file_hash(p)} for p in photos]})
+    binding = read_json(folder / 'batch-binding.json')
+    fingerprint = digest({'metadata': data, 'binding': binding, 'photos': [{'name': p.name, 'sha256': file_hash(p)} for p in photos]})
     return photos, data, fingerprint
 
 
@@ -86,7 +87,10 @@ def convert_photo(source: Path, destination: Path, thumbnail: Path) -> dict:
 
 def ingest_one(content: Path, folder: Path, brand: str) -> dict:
     folder_id = valid_id(folder.name)
-    content_id = valid_id(f'{brand}-{folder_id}')
+    binding = read_json(folder / 'batch-binding.json')
+    content_id = valid_id(binding['content_id'] if binding else f'{brand}-{folder_id}')
+    if not content_id.startswith(brand + '-') or not folder.resolve().is_relative_to(content.resolve()):
+        raise Blocked('SOURCE_BRAND_MISMATCH')
     dest = item_dir(content, content_id)
     prior = read_json(dest / 'item.json')
     photos, provided, source_hash = source_snapshot(folder)
@@ -96,7 +100,8 @@ def ingest_one(content: Path, folder: Path, brand: str) -> dict:
         raise Blocked('IMMUTABLE_OR_UNCERTAIN_PRODUCT')
     dest.mkdir(parents=True, exist_ok=True)
     if prior:
-        revision = dest / 'revisions' / prior['input_hash']
+        # Keep immutable revisions, with a bounded path on Windows (batch IDs are longer).
+        revision = content / 'revisions' / digest({'content_id': content_id, 'input_hash': prior['input_hash']})[:32]
         revision.mkdir(parents=True, exist_ok=True)
         for old in dest.iterdir():
             if old.is_file() and not (revision / old.name).exists():
@@ -104,10 +109,6 @@ def ingest_one(content: Path, folder: Path, brand: str) -> dict:
     records, duplicates, issues, seen = [], [], [], {}
     for photo in photos:
         sha = file_hash(photo)
-        if sha in seen:
-            duplicates.append({'file': photo.name, 'same_as': seen[sha]})
-            continue
-        seen[sha] = photo.name
         photo_id = 'p-' + sha[:24]
         original = dest / 'originals' / sha / photo.name
         original.parent.mkdir(parents=True, exist_ok=True)
@@ -115,6 +116,12 @@ def ingest_one(content: Path, folder: Path, brand: str) -> dict:
             shutil.copy2(photo, original)
         if file_hash(original) != sha:
             raise Blocked('ORIGINAL_HASH_MISMATCH')
+        if sha in seen:
+            duplicates.append({'file': photo.name, 'same_as': seen[sha], 'sha256': sha,
+                               'content_id': content_id, 'original_path': original.relative_to(dest).as_posix(),
+                               'recommendation': 'RECOMMEND_EXCLUDE', 'reason': '與同商品另一張照片位元完全相同。'})
+            continue
+        seen[sha] = photo.name
         processed = dest / 'processed' / f'{photo_id}.jpg'
         thumb = dest / 'processed' / f'{photo_id}-thumb.jpg'
         try:
@@ -123,7 +130,8 @@ def ingest_one(content: Path, folder: Path, brand: str) -> dict:
                 facts = convert_photo(original, processed, thumb)
             else:
                 facts = convert_photo(original, processed, thumb)
-            records.append({'photo_id': photo_id, 'source_name': photo.name, 'source_sha256': sha,
+            records.append({'photo_id': photo_id, 'asset_id': content_id + '-' + sha[:24], 'content_id': content_id,
+                            'source_name': photo.name, 'source_sha256': sha,
                             'original_path': original.relative_to(dest).as_posix(),
                             'processed_path': processed.relative_to(dest).as_posix(),
                             'thumbnail_path': thumb.relative_to(dest).as_posix(),
@@ -133,10 +141,21 @@ def ingest_one(content: Path, folder: Path, brand: str) -> dict:
     if not records:
         issues.append({'file': folder.name, 'code': 'NO_USABLE_PHOTOS', 'action': '每條商品資料夾至少放一張實際商品照片。'})
     item = {'schema_version': 1, 'brand': brand, 'content_id': content_id,
-            'source_folder': f'inbox/{folder_id}', 'input_hash': source_hash,
+            'source_folder': folder.relative_to(content).as_posix(), 'input_hash': source_hash,
             'user_provided': provided, 'photos': records, 'duplicates_removed': duplicates,
             'issues': issues, 'created_at': (prior or {}).get('created_at', now()), 'updated_at': now(),
             'status': 'NEEDS_INFO' if issues else 'DRAFT', 'publish_at': (prior or {}).get('publish_at')}
+    if binding:
+        if binding.get('brand') != brand or binding.get('product_ref') != folder_id:
+            raise Blocked('BATCH_PRODUCT_BINDING_MISMATCH')
+        actual = {p.name: file_hash(p) for p in photos}
+        expected = {p['file']: p['sha256'] for p in binding['source_images']}
+        if actual != expected or binding.get('metadata_hash') != digest(provided):
+            raise Blocked('BATCH_SOURCE_BINDING_CHANGED')
+        item.update(batch_id=binding['batch_id'], product_ref=binding['product_ref'],
+                    declared_schedule=binding['declared_schedule'], schedule_source='user_declared',
+                    publish_at=binding['declared_schedule'].get('publish_at'),
+                    identity_source='user_declared_batch')
     save_json(dest / 'item.json', item)
     return item
 

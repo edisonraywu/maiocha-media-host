@@ -1,23 +1,26 @@
-# 寶寶礦到了｜照片準備與人工審核
+# 寶寶礦到了｜每週／每兩週的商品批次
 
 系統固定使用 `approval_mode=true`、`auto_publish_without_approval=false`。**提供照片、看 Preview、請我準備或先排好，都不等於批准發布。第一次測試也要你明確同意。**
 
-## 平常怎麼用
+## 平常怎麼用：每週／每兩週一次
 
-1. **把照片給 Codex。**同一條素串的照片放在同一組，不同商品分清楚；有商品資料就附上，沒有也可以。
-2. **說「幫我處理這批寶寶礦照片」。**我會整理可存取的附件、逐條觀察實物、寫三版文案、QA、選封面與輪播順序。
-3. **等我交付 Preview。**內容停在 `READY_FOR_REVIEW`，讓你一次看整批。
-4. **不喜歡就指定修改。**例如「BB001 改短一點」或「這篇第二張和第四張交換」，只改該篇，再交給你審核。
-5. **你明確說「這幾篇可以發」。**只批准你指定的內容；第一篇測試也需說「這篇可以測試發」。
-6. **系統才安排或發布。**讀取你審核過的照片與文案，完成發布前檢查，成功後記錄 Media ID 並歸檔。
+1. 每條素串拍約六張不同角度，一批約 7～14 條。
+2. 把照片給 Codex，說「處理這批寶寶礦照片」。
+3. 告訴我每組的水晶名稱與商品代號，例如「BB001 海藍寶」。
+4. 告訴我每天要發哪一條，例如「10/1 BB001；10/2 BB002」。價格、珠徑、SKU、庫存、備註都可省略。
+5. 等 Preview：我整理照片、逐條看圖、寫三版文案、QA、推薦封面和輪播順序。
+6. 看整批照片與文案；此時全部停在 `READY_FOR_REVIEW`。
+7. 不喜歡就說「BB003 換 B」、「BB004 短一點」、「BB005 第一張與第三張交換」。只改那條。
+8. 你明確說「10/1～10/5 可以發」或指定商品批准；其餘保持待審核。
+9. 系統才對指定內容批准、Hosting、發布前檢查與排程。發布時用你審核過的原文，成功後保存 Media ID 並歸檔。
 
 若附件無法由工作區讀取，才會請你放到指定 inbox；不需要先研究下方技術細節。
 
-## 平常我到底要怎麼用
+## 收件與審核
 
 1. **照片放哪：**`content/baobao/inbox/`。
-2. **一條商品一個資料夾：**例如 `inbox/BB001/` 放這一串的所有實拍，再用 `inbox/BB002/` 放下一串。一次 10～30 組也可以。
-3. **商品資料可不填：**`product.yaml` 完全選填。不知道礦名、價錢或珠徑就留空，系統不猜。
+2. **一條商品一組照片：**可直接依 [收件模板](baobao-batch-intake.md) 告訴我對應关系。我會整理成批次資料夾，不需要你手寫 YAML。
+3. **水晶名稱由你提供：**正式商品必填 `crystal_name`；不知道時仍可先讀圖，但會停在 NEEDS_INFO。其他商品欄位選填，`product.yaml` 不必自己寫。
 4. **叫我 Prepare：**告訴我「幫我處理這批寶寶礦照片」。我會逐件讀圖、寫三版文案、QA、選封面／輪播，最後回報幾篇等待審核。
 5. **Preview 在哪：**雙擊 `content/baobao/preview/preview.html`。你會看到商品、照片順序、觀察、意境理由、三版文案、選定文案和狀態。
 6. **改某一篇：**說「BB001 文案短一點」、「不要那麼夢幻」或「BB001 第二張换第四張」。只修改對應商品，再回到等待審核。
@@ -37,11 +40,11 @@ content/baobao/inbox/
     IMG_003.jpg
 ```
 
-可從 `content/baobao/product.example.yaml` 複製。七欄全可留空：
+以下只是進階手動範例；正式批次由 Codex 依你的訊息填入。只有水晶名稱是正式商品必要資料，其他可空白：
 
 ```yaml
 product_name:
-crystal_name:
+crystal_name: 海藍寶
 price:
 bead_size:
 stock:
@@ -49,9 +52,9 @@ sku:
 notes:
 ```
 
-如果你提供 `crystal_name: 海藍寶` 才可正式寫海藍寶；沒提供就寫「這一串」。不從照片猜產地、礦種、珠徑、售價、等級、處理方式、證書或功效。
+只有你提供 `crystal_name: 海藍寶` 才可正式寫海藍寶；沒提供時只做照片分析，停在 NEEDS_INFO，不把品名或照片推測當成礦名。不猜產地、珠徑、售價、等級、處理方式、證書或功效。
 
-支援 JPEG、PNG、WebP、TIFF。HEIC 如無解碼器，請先匯出 JPEG。每資料夾最多 50 張，正式選圖最多 10 張；差照片不湊輪播。原圖保留不覆寫，只做方向校正、ICC 轉 sRGB、等比例縮放、平台尺寸留白與格式轉換，不重畫商品或改礦色／透明度。
+支援 JPEG、PNG、WebP、TIFF。HEIC 如無解碼器，需匯出 JPEG。每資料夾最多 50 張，正式選圖最多 10 張；六張都適合就六張。重複、模糊、過暗、偏色等照片保留原檔，Preview 明示 RECOMMEND_EXCLUDE 及理由。只做方向校正、ICC 轉 sRGB、等比例縮放、平台尺寸留白與格式轉換，不重畫商品或改礦色／透明度。
 
 ## 系統如何逐件準備
 
@@ -75,6 +78,35 @@ Preview 包含商品資料夾、Content ID、預計 target account、照片順�
 `READY_FOR_REVIEW` 不等於 APPROVED。修改照片、文案或日期會撤回舊排程／核准，回到待審核。Publisher、queue 與 test publish 都檢查批准紀錄，改設定成 auto 也不能繞過。
 
 ## 自己操作時的簡單指令
+
+平常不必自己執行。以下供 Codex 與進階操作使用；收件文字就是一般清單，照片來源目錄的每個子資料夾必須是你明確指定的商品代號，不能憑外觀猜分組。
+
+```powershell
+.\baobao.cmd batch intake --input .local\本批清單.txt --source .local\本批照片 --year 2026
+.\baobao.cmd batch prepare 2026-10-01_to_2026-10-14
+.\baobao.cmd batch preview 2026-10-01_to_2026-10-14
+.\baobao.cmd batch status 2026-10-01_to_2026-10-14
+```
+
+批次保存於 `content/baobao/batches/{batch_id}/batch.json`。裡面每條有獨立商品代號、水晶名、日期與照片 hash，完整 Content ID 包含 batch_id，所以下週再用 BB001 也不混資料。短代號有兩筆時必須用完整 Content ID 指定。
+
+只有你明確批准該範圍後：
+
+```powershell
+.\baobao.cmd approve-range 2026-10-01_to_2026-10-14 2026-10-01 2026-10-05
+```
+
+只批准這幾筆，不批准其餘商品。暫停或首次測試尚未完成時，保持 APPROVED，不自行解除安全閘門。之後依你的發布批准對指定 IDs 執行 schedule。
+
+修改與補資料：
+
+```powershell
+.\baobao.cmd select-caption BB003 B
+.\baobao.cmd batch update 2026-10-01_to_2026-10-14 BB004 --publish-date 2026-10-08 --price 3280
+.\baobao.cmd batch add-photos 2026-10-01_to_2026-10-14 BB004 --source .local\BB004補照
+```
+
+資料／照片有變後，重新執行該批 prepare 會重用未變商品；文案或輪播修改只操作指定商品。再次回到待審核。不同照片同名時不覆寫原檔，需替補照取不同檔名。
 
 在 `New project` 工作區開終端機：
 
@@ -114,7 +146,9 @@ Preview 包含商品資料夾、Content ID、預計 target account、照片順�
 .\baobao.cmd cancel baobao-BB002
 ```
 
-日期修改只代表建議日期，必須再次批准。每週頻率在 `maiocha-media-host-staging/config/brands/baobao.yaml` 的 `posting`；目前樣板是週二／四／六 20:00，每週 3 篇、Asia/Taipei。`posting_days` 採 0=週一至 6=週日。這不是演算法最佳時間。
+批次日期以你指定為準，存為 PROPOSED_SCHEDULE，批准前不登記發布。系統不交換商品日期；同一天兩篇會提醒，但不自行挪動。缺少日期時只詢問那筆。批次改日期用 `batch update`，以同步商品宣告與 manifest，並撤回舊批准。
+
+每日預設時間保存於 `config/brands/baobao.yaml` 的 `posting.default_publish_time`，時區 Asia/Taipei；單篇時間優先。既有 `posting_days`／`posting_times`／`posts_per_week` 只供沒有 Batch 的舊 inbox 建議日曆，不能覆蓋你指定的日期，也不是演算法最佳時間。
 
 日曆盡量錯開色系、hook、結構、構圖與相同 SKU。GitHub 每 15 分鐘查詢到期內容，可能延遲；每次最多 1 篇，逾時超過 24 小時停止待重新安排。[GitHub 排程限制](https://docs.github.com/en/actions/how-tos/troubleshoot-workflows)
 
@@ -155,6 +189,8 @@ Preview 包含商品資料夾、Content ID、預計 target account、照片順�
 
 ## 一次性的 Meta 接入
 
+**目前已完成。**真實 API 已驗證日常收藏所 Page → `babycrystal.tw`，四個 GitHub Secrets 已建立並由 Actions 使用。以下僅供日後 Token 失效時重新授權，不需要每批重做。
+
 沿用 `MaiOcha Lab Automation`，App ID `1833218008099793`，不用重連 Facebook ↔ IG。
 
 1. 開 [Graph API Explorer](https://developers.facebook.com/tools/explorer/)，選上面的既有 App。
@@ -185,6 +221,8 @@ GitHub PAT 權限目前已修正，可部署 workflows、操作 Actions 和 Secr
 `baobao.cmd validate --live-account` 可唯讀核對實際帳號與品牌命名空間，不發布內容。GitHub Actions 的手動 Dry Run 也會使用 repository Secrets 做此檢查；排程執行仍由既有批准與 pause 閘門控制。
 
 ## 第一篇真實測試
+
+本次 Batch 工程驗收不要求現在提供照片，也不做任何 Instagram POST。首次實物文案品質與測試發布會在未來收到真實照片後進行；fixture 測試不冒充實物驗收。
 
 GitHub、Meta 都完成後，提供一條真實商品照片；資料夾預設 `inbox/2026-10-001/`。Prepare 後先停在 READY_FOR_REVIEW，讓你看真實 Preview。
 

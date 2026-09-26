@@ -46,10 +46,13 @@ class FixtureGenerator:
                        {'fact_id': 'white', 'description': '有白色區塊', 'evidence_photo_ids': ids}],
                 photo_reviews=[{'photo_id': k, 'usable': not self.unusable, 'issues': [], 'composition': '全貌',
                    'dominant_colors': ['藍'], 'lighting': '側光', 'colour_reliable': True, 'wearing': False,
-                   'close_up': False, 'full_view': True, 'flat_lay': True, 'cover_score': 80, 'product_count': 1, 'same_product': True} for k in ids],
+                   'close_up': False, 'full_view': True, 'flat_lay': True, 'cover_score': 80, 'product_count': 1, 'same_product': True,
+                   'photo_type': 'full_product', 'sharpness': '清晰', 'exposure': '適中', 'white_balance': '可辨識',
+                   'product_visibility': '完整', 'duplicate_similarity': '不同角度', 'similar_to_photo_id': None,
+                   'selection_reason': '清晰展示商品全貌與此角度的白色區塊。'} for k in ids],
                 selected_photo_ids=ids[:10], issues=[])
         if stage == 'basis':
-            return dict(base, dominant_color=['藍'], secondary=['白'], light='側光', visual_mood=['偏冷'],
+            return dict(base, dominant_color=['藍'], secondary=['白'], light='側光', visual_mood=['偏冷'], photo_characteristics=['平放全貌', '白色區塊'],
                 user_provided_crystal=payload['user_provided']['crystal_name'], candidate_imagery=['雨後'],
                 rejected_imagery=['夕陽'], reason='照片中藍白相間，光偏冷。', evidence_fact_ids=['blue', 'white'],
                 user_provided_facts=[], unknown_facts=[], content_style='商品主角')
@@ -58,6 +61,8 @@ class FixtureGenerator:
             captions = [f'這一串的{word}，和白色交錯。\n今天想多看它一眼。',
                         f'{word}與白，像雨後窗邊。\n這一串有自己的層次。',
                         f'今天戴{word}。\n白色藏在這一串裡。']
+            crystal = payload['user_provided'].get('crystal_name')
+            captions = [(crystal + '。\n' if crystal else '') + text for text in captions]
             return dict(base, candidates=[{'key': key, 'caption': text, 'hook': text.split('\n')[0], 'structure': key,
                'claims': [{'text': word, 'source': 'visual', 'references': ['blue']},
                           {'text': '白色' if '白色' in text else '白', 'source': 'visual', 'references': ['white']}],
@@ -136,6 +141,8 @@ class PipelineTests(unittest.TestCase):
         self.temp.cleanup()
 
     def product(self, name='one', count=1, data=None):
+        if data is None:
+            data = {'crystal_name': '海藍寶'}
         folder = self.content / 'inbox' / name
         folder.mkdir(parents=True, exist_ok=True)
         for index in range(count):
@@ -165,13 +172,13 @@ class PipelineTests(unittest.TestCase):
         return Publisher(self.repo, self.config, self.state, meta or FakeMeta(), HostedFiles(self.repo, self.config, fail_host))
 
     def test_optional_metadata_never_filled_from_image(self):
-        item = self.prepared()
+        item = self.prepared(data={})
         grounding = read_json(item_dir(self.content, item['content_id']) / 'product_grounding.json')
         self.assertEqual(grounding['user_provided']['crystal_name'], None)
         self.assertIn('price', grounding['unknown_fields'])
-        self.assertEqual(item['status'], 'READY_FOR_REVIEW')
-        report = check_prepared(self.content, item)
-        self.assertEqual(report['result'], 'PASS')
+        self.assertEqual(item['status'], 'NEEDS_INFO')
+        self.assertIn('USER_CRYSTAL_NAME_REQUIRED', item['prepare_errors'])
+        self.assertFalse((item_dir(self.content, item['content_id']) / 'selected_caption.txt').exists())
 
     def test_product_folders_do_not_share_metadata(self):
         a = ingest_one(self.content, self.product('a', data={'price': 111, 'crystal_name': '海藍寶'}), 'baobao')
@@ -207,7 +214,7 @@ class PipelineTests(unittest.TestCase):
         self.assertEqual(item['status'], 'NEEDS_INFO')
 
     def test_unknown_mineral_price_bead_and_transparency_rejected(self):
-        item = self.prepared()
+        item = self.prepared(data={'crystal_name': '白水晶'})
         folder = item_dir(self.content, item['content_id'])
         g, b = read_json(folder / 'product_grounding.json'), read_json(folder / 'caption_basis.json')
         for caption, code in [('海藍寶', 'UNPROVIDED_MINERAL:海藍寶'), ('售價3280', 'UNPROVIDED_PRICE'),
