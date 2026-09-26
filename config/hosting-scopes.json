@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "hosting": {
+    "provider": "github_pages",
+    "repository": "edisonraywu/maiocha-media-host",
+    "base_url": "https://edisonraywu.github.io/maiocha-media-host"
+  },
+  "brands": {
+    "maiocha": {
+      "campaigns": {
+        "買房喵查局正式開張_2026-09-16": {
+          "namespace": "media/maiocha-launch-2026-09-16",
+          "source_root": "買房喵查局內容系統/07_待發布/2026-09-16_買房喵查局正式開張_正式發布Bundle"
+        },
+        "看屋別只看裝潢_2026-09-18": {
+          "namespace": "media/maiocha-inspection-2026-09-18",
+          "source_root": "買房喵查局內容系統/07_待發布/2026-09-18_看屋別只看裝潢_正式發布Bundle"
+        },
+        "maiocha-restart-firstpost-mortgage-ltv-2026-09-19": {
+          "namespace": "media/maiocha-restart-firstpost-mortgage-ltv-2026-09-19",
+          "source_root": "買房喵查局內容系統/07_待發布/2026-09-19_房貸7成不等於核貸7成_正式發布Bundle"
+        },
+        "maiocha-first-post-needs-three-2026-09-21": {
+          "namespace": "media/maiocha-first-post-needs-three-2026-09-21",
+          "source_root": "買房喵查局內容系統/07_待發布/2026-09-20_第一篇_完整草稿/FIRST_POST_FINAL_BUNDLE"
+        }
+      },
+      "content_root": "買房喵查局內容系統"
+    },
+    "baobao": {
+      "namespace": "media/baobao",
+      "source_root": "content/baobao/items",
+      "content_id_pattern": "^baobao-[A-Za-z0-9][A-Za-z0-9_-]{0,72}$",
+      "content_root": "content/baobao"
+    }
+  }
+}

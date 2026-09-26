@@ -316,7 +316,7 @@ def run(args):
         journal().initialize()
         return {'journal_initialized': True, 'note': '既有紀錄不會重設。'}
     if command == 'host':
-        return host(repo, workspace)
+        return host(repo, workspace, config)
     if command == 'sync':
         result = sync_archive(content, journal())
         render_preview(content, config)

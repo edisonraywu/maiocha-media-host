@@ -146,6 +146,13 @@ def credentials(config: dict) -> dict:
     return result
 
 
+def assert_item_brand(item: dict, config: dict) -> None:
+    """Reject a foreign context before generation, approval or staging can write anything."""
+    brand = config.get('brand')
+    if brand not in BRANDS or item.get('brand') != brand or not valid_id(item.get('content_id')).startswith(brand + '-'):
+        raise Blocked('ITEM_BRAND_CONTEXT_MISMATCH')
+
+
 def parse_time(value: str) -> datetime:
     try:
         stamp = datetime.fromisoformat(value.replace('Z', '+00:00'))

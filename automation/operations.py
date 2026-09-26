@@ -27,7 +27,7 @@ def schedule_batch(repo: Path, workspace: Path, content: Path, config: dict, sel
     if test_only and (len(selection) != 1 or selection[0].get('content_type') != 'SINGLE'):
         raise Blocked('FIRST_TEST_MUST_BE_EXACTLY_ONE_SINGLE')
     packages = [stage_release(repo, content, item, config) for item in selection]
-    (host_action or (lambda: host(repo, workspace)))()
+    (host_action or (lambda: host(repo, workspace, config)))()
     net = transport or Transport()
     results = []
     for item, pack in zip(selection, packages):
@@ -53,9 +53,13 @@ def schedule_batch(repo: Path, workspace: Path, content: Path, config: dict, sel
     return results
 
 
-def host(repo: Path, workspace: Path):
+def host(repo: Path, workspace: Path, config: dict):
     """Reuse the existing GitHub Pages checkout and DPAPI Git askpass helper."""
-    allowed = ('media/baobao', 'releases/baobao', 'config/brands/baobao.yaml')
+    from .core import BRANDS
+    brand = config['brand']
+    if brand not in BRANDS or config['hosting']['namespace'] != f'media/{brand}':
+        raise Blocked('HOSTING_BRAND_CONTEXT_MISMATCH')
+    allowed = (config['hosting']['namespace'], f'releases/{brand}', f'config/brands/{brand}.yaml')
     def git(*args):
         result = subprocess.run(['git', '-C', str(repo), *args], capture_output=True, env=env, timeout=120)
         if result.returncode:
@@ -67,7 +71,7 @@ def host(repo: Path, workspace: Path):
     if askpass.exists():
         env['GIT_ASKPASS'] = str(askpass)
     remote = git('remote', 'get-url', 'origin')
-    if remote != 'https://github.com/edisonraywu/maiocha-media-host.git':
+    if remote != 'https://github.com/' + config['hosting']['repository'] + '.git':
         raise Blocked('UNEXPECTED_HOSTING_REMOTE')
     if git('branch', '--show-current') != 'main':
         raise Blocked('HOSTING_REQUIRES_MAIN_BRANCH')
@@ -80,17 +84,19 @@ def host(repo: Path, workspace: Path):
     paths = [p for p in allowed if (repo / p).exists()]
     git('add', '--', *paths)
     if git('diff', '--cached', '--name-only'):
-        git('commit', '-m', 'Stage approved baobao publishing assets')
+        git('commit', '-m', f'Stage approved {brand} publishing assets')
     git('push', 'origin', 'main')
     return {'status': 'HOSTED_PENDING_PUBLIC_VERIFICATION', 'note': 'Pages 建置完成後，schedule 會重新下載核對每張圖。'}
 
 
 def sync_archive(content: Path, journal):
     state, _ = journal.read()
+    items = [(path, read_json(path)) for path in item_files(content)]
+    if any(item.get('brand') != state['brand'] or not item['content_id'].startswith(state['brand'] + '-') for _, item in items):
+        raise Blocked('ARCHIVE_BRAND_CONTEXT_MISMATCH')
     save_json(content / 'history' / 'published-history.json', {'brand': state['brand'], 'checked_at': now(),
               'items': list(state['items'].values()), 'history': state['history']})
-    for path in item_files(content):
-        item = read_json(path)
+    for path, item in items:
         entry = state['items'].get(item['content_id'])
         if not entry:
             continue

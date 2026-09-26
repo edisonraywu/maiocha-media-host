@@ -1,0 +1,65 @@
+{
+  "schema_version": 1,
+  "files": [
+    {
+      "source": "legacy/maiocha/Instagram官方發布/同步發布CampaignV2.ps1",
+      "destination": "買房喵查局內容系統/11_系統工具/Instagram官方發布/同步發布CampaignV2.ps1",
+      "original_sha256": "1009dc2e62e2375873e34752bce37e28c8a404e525cbf4b8aee5167f54737295"
+    },
+    {
+      "source": "legacy/maiocha/Instagram官方發布/同步發布品牌.ps1",
+      "destination": "買房喵查局內容系統/11_系統工具/Instagram官方發布/同步發布品牌.ps1",
+      "original_sha256": "d07c9102539e9adba411bc61aaacd805f60ea20ef112fd8e7665ef12e9290aed"
+    },
+    {
+      "source": "legacy/maiocha/媒體託管/GitHubPagesMediaHosting.ps1",
+      "destination": "買房喵查局內容系統/11_系統工具/媒體託管/GitHubPagesMediaHosting.ps1",
+      "original_sha256": "bf4acd242ff4bf6a49acb7a5e3f363036bffa20f51eab1c39d88ee71bb9198c4"
+    },
+    {
+      "source": "legacy/maiocha/媒體託管/Prepare-GitHubPagesStaging.ps1",
+      "destination": "買房喵查局內容系統/11_系統工具/媒體託管/Prepare-GitHubPagesStaging.ps1",
+      "original_sha256": "7b885252db198f591e52acb0d1d9571fabe109cdb9099a957f96e7ddf50b4243"
+    },
+    {
+      "source": "legacy/maiocha/媒體託管/GitHubReleaseMediaHosting.ps1",
+      "destination": "買房喵查局內容系統/11_系統工具/媒體託管/GitHubReleaseMediaHosting.ps1",
+      "original_sha256": "4bc917b4cc466a74e77d85e87ff98eadb3c12c70ae66035213da57b8c88f022b"
+    },
+    {
+      "source": "legacy/maiocha/媒體託管/Finalize-GitHubPagesHosting.ps1",
+      "destination": "買房喵查局內容系統/11_系統工具/媒體託管/Finalize-GitHubPagesHosting.ps1",
+      "original_sha256": "681ace344bbfd9fdd8364a4e0c5bf00b7b39b8191f0a181e16db3675f78155c5"
+    },
+    {
+      "source": "legacy/maiocha/媒體託管/Finalize-20260918-GitHubPages.ps1",
+      "destination": "買房喵查局內容系統/11_系統工具/媒體託管/Finalize-20260918-GitHubPages.ps1",
+      "original_sha256": "af0f218f3f8cc6c7b7b3b1a839b10d7a879ed134e2055c7cad766a21a401967c"
+    },
+    {
+      "source": "legacy/maiocha/媒體託管/Finalize-Ultimate-GitHubPages.ps1",
+      "destination": "買房喵查局內容系統/11_系統工具/媒體託管/Finalize-Ultimate-GitHubPages.ps1",
+      "original_sha256": "d8168c50259656b7c2306e2ffa4419cd342069c66724058fde53d1b531ffda27"
+    },
+    {
+      "source": "legacy/maiocha/媒體託管/Finalize-Ultimate-GitHubPages-Curl.ps1",
+      "destination": "買房喵查局內容系統/11_系統工具/媒體託管/Finalize-Ultimate-GitHubPages-Curl.ps1",
+      "original_sha256": "bb3e2940d63524c7628e4de227506856735b08ef7889f1b67f4494b1be483d95"
+    },
+    {
+      "source": "legacy/maiocha/Instagram官方發布/同步發布Campaign.ps1",
+      "destination": "買房喵查局內容系統/11_系統工具/Instagram官方發布/同步發布Campaign.ps1",
+      "original_sha256": "1b69a771e04b076b454784df3facc5ca4c7bdae1895cd0b57fd0d652520ac741"
+    },
+    {
+      "source": "legacy/maiocha/Instagram官方發布/發布單張測試.ps1",
+      "destination": "買房喵查局內容系統/11_系統工具/Instagram官方發布/發布單張測試.ps1",
+      "original_sha256": "3d9755b4fe00b1e1e6c4b115a766f303c6fa9958b8b8805a40ad308403338647"
+    },
+    {
+      "source": "legacy/maiocha/Instagram官方發布/暫時公開測試圖片.ps1",
+      "destination": "買房喵查局內容系統/11_系統工具/Instagram官方發布/暫時公開測試圖片.ps1",
+      "original_sha256": "ffa323546b6186fb58f3af1603fa0de9b79f4e3d5d8afb03f92d4ca16c9daf43"
+    }
+  ]
+}

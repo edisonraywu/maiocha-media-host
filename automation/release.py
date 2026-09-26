@@ -7,10 +7,11 @@ from urllib.parse import quote, urlparse
 
 from PIL import Image
 
-from .core import (Blocked, atomic_bytes, digest, file_hash, inside, item_dir, now,
+from .core import (Blocked, assert_item_brand, atomic_bytes, digest, file_hash, inside, item_dir, now,
                    parse_time, read_json, save_json, secret_free, text_hash, valid_id)
 from .pipeline import check_prepared
 from .schemas import QA_KEYS
+from .hosting_scope import public_asset_key
 
 
 def approval_fingerprint(item: dict, config: dict):
@@ -19,6 +20,7 @@ def approval_fingerprint(item: dict, config: dict):
 
 
 def approve(content: Path, item: dict, config: dict):
+    assert_item_brand(item, config)
     from .style import require_formal_item
     require_formal_item(content, item)
     if item['status'] not in ('READY_FOR_REVIEW', 'APPROVED', 'SCHEDULED'):
@@ -42,6 +44,7 @@ def approve(content: Path, item: dict, config: dict):
 
 
 def build_release(content: Path, item: dict, config: dict) -> dict:
+    assert_item_brand(item, config)
     if item.get('status') not in ('APPROVED', 'SCHEDULED') or item.get('approval_state') != 'APPROVED':
         raise Blocked('EXPLICIT_APPROVAL_REQUIRED')
     report = check_prepared(content, item)
@@ -62,6 +65,7 @@ def build_release(content: Path, item: dict, config: dict) -> dict:
         p = photos[key]
         name = f'{index + 1:02d}-{p["processed_sha256"][:16]}.jpg'
         public_path = prefix + '/' + name
+        public_asset_key(config, item['content_id'], public_path)
         assets.append({'photo_id': key, 'path': public_path, 'sha256': p['processed_sha256'],
                        'mime': 'image/jpeg', 'width': 1080, 'height': 1350,
                        'url': config['hosting']['base_url'].rstrip('/') + '/' + public_path})
@@ -175,6 +179,7 @@ def validate_release(repo: Path, release: dict, config: dict):
         expected_url = config['hosting']['base_url'].rstrip('/') + '/' + path
         if asset.get('url') != expected_url or not expected_url.startswith('https://'):
             raise Blocked('ASSET_URL_MISMATCH')
+        public_asset_key(config, cid, path, asset['url'])
         local = inside(repo, path)
         if not local.is_file() or file_hash(local) != asset['sha256']:
             raise Blocked('ASSET_HASH_MISMATCH')

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from .core import (Blocked, PRODUCT_FIELDS, atomic_bytes, digest, file_hash, inside, item_dir,
+from .core import (Blocked, PRODUCT_FIELDS, assert_item_brand, atomic_bytes, digest, file_hash, inside, item_dir,
                    item_files, local_lock, now, read_json, save_json)
 from .ingest import ingest, source_snapshot
 from .qa import grounding_errors, qa_report, validate
@@ -12,6 +12,7 @@ PROVENANCE = ('brand', 'source_folder', 'user_provided', 'unknown_fields', 'user
 
 def observe_product(content: Path, item: dict, config: dict, generator, *, with_basis=True):
     """Shared actual-photo grounding/basis; no caption selection, approval or publication."""
+    assert_item_brand(item, config)
     assert_current(content, item)
     folder = item_dir(content, item['content_id'])
     base = {'content_id': item['content_id'], 'input_hash': item['input_hash'],
@@ -75,6 +76,7 @@ def assert_current(content: Path, item: dict) -> None:
 
 
 def prepare_one(content: Path, item: dict, config: dict, generator, recent: list[dict]) -> dict:
+    assert_item_brand(item, config)
     folder = item_dir(content, item['content_id'])
     if item['status'] in ('PUBLISHED', 'PUBLISHING', 'MANUAL_ACTION_REQUIRED', 'CANCELLED'):
         return item

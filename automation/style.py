@@ -39,6 +39,8 @@ def profile_hash(profile: dict) -> str:
 
 
 def save_profile(content: Path, profile: dict) -> dict:
+    if content.name != 'baobao' or profile.get('brand') != 'baobao':
+        raise Blocked('BAOBAO_STYLE_PROFILE_CONTEXT_REQUIRED')
     secret_free(profile)
     profile['profile_hash'] = profile_hash(profile)
     atomic_bytes(content / PROFILE_PATH, yaml.safe_dump(profile, allow_unicode=True, sort_keys=False).encode('utf-8'))
@@ -46,6 +48,8 @@ def save_profile(content: Path, profile: dict) -> dict:
 
 
 def load_profile(content: Path, *, required=False, confirmed=True) -> dict | None:
+    if content.name != 'baobao':
+        raise Blocked('BAOBAO_STYLE_PROFILE_CONTEXT_REQUIRED')
     path = content / PROFILE_PATH
     if not path.exists():
         if required:
@@ -81,6 +85,8 @@ def load_profile(content: Path, *, required=False, confirmed=True) -> dict | Non
 def require_formal_item(content: Path, item: dict) -> dict:
     if item.get('purpose') == 'calibration' or item['content_id'].startswith('baobao-calibration-'):
         raise Blocked('CALIBRATION_CANNOT_PUBLISH_OR_SCHEDULE')
+    if item.get('brand') != 'baobao':
+        raise Blocked('BAOBAO_STYLE_PROFILE_CONTEXT_REQUIRED')
     return load_profile(content, required=True)
 
 

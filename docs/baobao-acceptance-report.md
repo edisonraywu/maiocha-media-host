@@ -1,72 +1,58 @@
-# 寶寶礦到了｜Batch 與文案風格校準工程驗收
+# 寶寶礦到了｜Multi-Brand Isolation 安全修復驗收
 
-驗收日期：2026-09-26，Asia/Taipei。已保存 **Default Publish Time = 10:00 Asia/Taipei**，單篇時間覆蓋預設且不修改品牌設定。
+驗收日期：2026-09-26，Asia/Taipei。本次保留原 commits、品牌資料夾、Meta App 與 Hosting 路徑，沒有重新命名 New project、搬動商品、產生假校準內容、發布 Instagram 或 Resume production。
 
-`READY_FOR_BATCH_PHOTO_WORKFLOW = YES`
+## 本機修復與重新稽核
 
-`CAPTION_CALIBRATION_SYSTEM_READY = YES`
-
-`WAITING_FOR_CALIBRATION_PRODUCTS = YES`
-
-目前 checkpoint：等待第一組 **1～3 條真實校準商品，每條約六張照片**。不要求正式 7～14 天 Batch。`CAPTION_STYLE_CALIBRATED = NO`：尚未收到真實照片與使用者風格回饋，沒有預先建立正式風格偏好。
-
-## 部署與基礎整合
-
-| 項目 | 真實結果／證據 |
+| 項目 | 結果與證據 |
 |---|---|
-| GitHub deployment | PASS；程式版本 `af1b3517c8fdb6ea07e1bb1ca9521665190bba8f` 已推送，沿用既有 commits，無回滾 |
-| Actions / CI | PASS；[CI](https://github.com/edisonraywu/maiocha-media-host/actions/runs/36241770138)；131 項 baobao tests |
-| GitHub Pages | PASS；[Pages deployment](https://github.com/edisonraywu/maiocha-media-host/actions/runs/36241769870)；沿用 maiocha-media-host |
-| Meta | PASS；MaiOcha Lab Automation / 1833218008099793，Facebook Login、Graph v26.0 |
-| Secrets | PASS；BAOBAO_PAGE_ID、BAOBAO_IG_USER_ID、BAOBAO_IG_USERNAME、BAOBAO_PAGE_ACCESS_TOKEN 皆存在且由 Actions 使用；沒有輸出 Secret 值 |
-| Account Verification | PASS；真實 API：日常收藏所 → 寶寶礦 IG `babycrystal.tw`，Page、IG ID、username、權限與品牌 namespace 核對 |
-| Cloud Dry Run | PASS；[唯讀帳號／Secrets／journal 驗證](https://github.com/edisonraywu/maiocha-media-host/actions/runs/36241800641)；Instagram POST=0 |
-| Pause | PASS；journal paused=true、production_ready=false、queue=0、items=0；環境變數 pause 與發布途中 pause 測試通過 |
-| maiocha regression | PASS；原有 8 項狀態機測試，全數通過；40 個原檔 hash 完全未變 |
-| Security | Token 未寫入 repo、Preview、manifest 或此報告；私人 content／.env／DPAPI 不在提交內容 |
+| Hosting Cache Identity | PASS；schema 2 綁定 brand、Campaign、asset key、來源根目錄／路徑、SHA-256、完整及正規化 URL、原始及正規化 object key、namespace、MIME。舊 hash-only evidence 不再命中 |
+| Formal Publisher URL Gate | PASS；maiocha 的正式 API 前再次檢查 URL 與 Campaign，正式發布重新下載 hash／MIME；拒絕 redirects。原本同 hash 換 baobao URL 的漏洞，唯讀重現已被拒絕 |
+| Hosting Brand Boundary | PASS；雙向 upload、overwrite、delete、cleanup 與來源範圍；路徑 segment、URL decoding、dot segments、重複斜線、prefix collision、junction／symlink 防線 |
+| Generic Launcher | PASS；必須 -Brand maiocha 或 baobao；缺少／未知／重複 override 拒絕；原 maiocha 入口位置保留 |
+| Older Entrypoints | PASS；舊 Campaign／單張／臨時 Hosting 也限制 maiocha 來源及確認範圍。單張測試的任意外部 URL 路徑關閉；目前設定本來就使用本機圖片臨時 Hosting |
+| Retired Release Backend | PASS；無啟用設定的 GitHub Release asset 寫入／刪除介面停止接受操作，現行 Pages 不受影響 |
+| Current Hosting Inventory | PASS；依真實 manifest/config 登記四個 maiocha Campaign；唯讀核對 40 份現有素材全部通過，沒有移動或改名 |
+| Scope / Shared Engine | PASS；安全核心由 config scope 決定品牌差異，不內嵌 Token／IG ID／Caption；repository 名稱是歷史名稱，不視為混用 |
+| State Isolation | PASS；品牌獨立 journal／queue／history，跨品牌 approval、claim、schedule、history 寫入拒絕；錯品牌 config 不能進入文案生成 |
+| Pause Isolation | PASS；兩品牌獨立狀態測試；baobao 不 Resume |
+| Actual maiocha Publisher Dry Run | PASS；修復後真實 API、10 份公開素材、中文 Caption／既有 QA／history／target checks 全通過；Instagram POST=0 |
+| Python Regression | PASS；146 tests，含原有 131 與新增 15 項 isolation tests；60.621 秒 |
+| PowerShell Security | PASS；53 個案例，含快取、双向 Hosting、launcher、舊入口、原狀態機整合；只使用 fixtures，不發布 |
+| maiocha Original Tests | PASS；原 8 項狀態機測試保持原內容，在安全案例中及本機原入口驗證 |
+| Baseline | PASS；原 40 檔 baseline 不重設。29 檔未變，11 檔為授權的安全修復；另修 generic launcher，共 12 個原位置工具。無意外變更 |
+| Deployment Copies | PASS；12 份本機工具與 repository 的部署來源逐一 hash 相同；更新前有 preimage 檢查與私人備份 |
+| Workflow Syntax | PASS；YAML 解析、job 結構；新增 Windows／Linux PowerShell CI，原 baobao 發布 workflow 不修改 |
 
-## Batch Final Acceptance
+## Batch 與 Caption Calibration 回歸
+
+以下由完整測試驗證，沒有把 fixtures 當成真實商品文案品質：
 
 | 項目 | 結果 |
 |---|---|
-| Batch Architecture / Natural Language Intake | PASS；重用 batches、items、CLI，保存使用者原始宣告；不用手寫 YAML |
-| 7-day / 14-day Batch | PASS（fixtures）；7／14 商品，各6張，共42／84張，不跨商品 |
-| Six Photo Logic / Product Binding | PASS；asset_id、content_id、hash；保留原圖；重複與劣質照片明示 RECOMMEND_EXCLUDE 和原因 |
-| User Declared Crystal Name | PASS；礦名只由使用者提供；缺少可先 Grounding，但不能完成文案 |
-| Schedule Mapping | PASS；保留使用者日期、偵測撞期、10:00預設、19:30／20:30單篇覆蓋；未批准只有 proposed schedule |
-| Grounding / Caption Basis / Caption Pipeline | PASS（結構與安全 fixtures）；實際商品照片決定描述，身份與價格等只來自手動資料 |
-| Product Caption QA | PASS；攔錯色、錯礦名、跨商品內容、未知事實、失效照片／文字 hash；最多重試一次 |
-| Batch Preview / Partial Approval | PASS；圖片、順序、三候選、Selected、日期、狀態；指定範圍只批准該範圍 |
-| Unapproved Publish Block | PASS；發布與 queue 頂層要求明確批准，Style 校準不取代商品批准 |
-| Publisher / Hosting / Archive / Duplicate | PASS（mock integration）；沿用既有 publisher、Pages namespace、journal；正式發布只讀保存且批准的 caption，不臨時生成；保存Media ID與hash並防重複 |
+| Batch / Natural-language Intake | PASS；7／14 天商品、每條約 6 張、content_id／asset_id／hash 隔離 |
+| User Identity / Metadata | PASS；crystal_name 只接受使用者提供；商品與 metadata 不跨組 |
+| Schedule | PASS；保留使用者日期；預設 **10:00 Asia/Taipei**；單篇 override 不改品牌預設 |
+| Grounding / Caption Basis / Product Caption QA | PASS；實際照片優先，不猜礦名、價格、珠徑、功效；錯色與跨商品資料拒絕 |
+| Calibration / Six Styles / Preview | PASS；1～3 商品、每條獨立六種 Style；CALIBRATION_READY_FOR_REVIEW 後停止 |
+| Feedback / Profile / Updates | PASS；自然語言偏好保存、使用者確認後才建立正式 Profile；可持續更新 |
+| Style QA / Wording Repetition | PASS；語氣、風景、句型、CTA、signature 與近期重複檢查 |
+| Formal Batch Calibration Gate | PASS；未校準不能 finalize Caption 或正式批准排程 |
+| Calibration Cannot Schedule / Publish | PASS；校準確認不等於商品發布批准；偽造 APPROVED 也不得發 |
+| Approval / Reviewed Caption / Duplicate / Archive | PASS；只發布事前 QA 且明確批准的版本；發布當下不重新生成，保存 Media ID 與 hash，禁止自動重複 |
 
-## Caption Calibration Acceptance
+## 遠端部署驗證
 
-| 項目 | 結果 |
-|---|---|
-| Calibration Architecture | PASS；私人 session、1～3產品、每條獨立內容ID；重用 ingest、grounding、basis、QA 和照片排序 |
-| Six Style Generator | PASS（fixtures）；每商品 A商品貼合／B顏色意境／C風景／D極簡／E日常／F品牌，六版均綁定當前商品，沒有自選唯一品牌Style |
-| Style Metadata | PASS；tone、length、poetry、imagery、daily life、sales、CTA、emoji、signature、why it fits 均保留 |
-| Calibration Preview | PASS；3商品×6照片×6Style 的 HTML／JSON 結構；18圖片連結與圖像解碼、18候選及QA綁定通過；非真實商品品質驗收 |
-| Feedback Parser | PASS；自然中文喜歡／排除、混合句、語氣／段落、emoji、CTA、signature、長短等；只保留明確偏好，歧義逐處保存待確認 |
-| Profile Mechanism / Persistence / Update | PASS；收到明確回饋才保存私人 `content/baobao/config/baobao-caption-style.yaml`；保留來源、例句、排除句、版本，確認後才 calibrated；之後可更新 |
-| Style QA | PASS；獨立模型檢查＋確定性文字規則，profile／caption／content hash 綁定；漂移最多再生一次，仍FAIL不得READY |
-| Wording Repetition Detection | PASS；近期形容詞、開頭、結尾、風景、CTA、品牌句與文字相似度；校準Preview顯示提醒，正式批次納入Style QA |
-| Formal Batch Calibration Gate | PASS；未CALIBRATED，只 ingest／photo QA／grounding，WAITING_FOR_CALIBRATION；不能Final Caption／approve／schedule |
-| No Schedule / Publish During Calibration | PASS；校準不存發布日期；reserved calibration ID 與 purpose 在 publisher／queue 最上層拒絕，偽造APPROVED也不能發，test publish 同樣拒絕 |
-| Profile Changes / Reviewed Caption | PASS；更新風格前先撤回舊queue，未發布商品重新QA與審核；發布使用已審核文字，不載入生成器 |
-| Tests / Regression | PASS；本機 131 項 baobao、8 項 maiocha；相同程式在GitHub CI通過 |
+本機修復與稽核已 PASS；本次新版本 GitHub push、CI、Pages、遠端 dry-run／暫停狀態尚待本輪部署後記錄，不能以先前 CI 代替新版本結果。
 
-實際商品照片=0、實際Instagram POST=0、實際Media ID=無。工程 fixtures 僅驗證流程與安全，沒有冒充真實水晶圖、真實文案品質或使用者已選定的品牌風格。校準Preview以本機HTML解析、路徑／圖片解碼驗證；因瀏覽器 file URL 限制，沒有宣稱完成瀏覽器目視驗收。
+沿用 MaiOcha Lab Automation（1833218008099793）及 Facebook Login。已驗證的帳號為 maiocha.lab／藍屋生活誌與 babycrystal.tw／日常收藏所；BAOBAO 四個 Secrets 名稱保持獨立。部署階段只讀取 Secret 存在狀態，不輸出值。
 
-## 日常使用與下一個 checkpoint
+## 下一個 checkpoint
 
-第一次：1～3條照片＋每條水晶名稱 → 商品觀察 → 六種Style Preview → 使用者回饋 → 確認Style Profile。校準不發文。
+工程驗收完成後只等待 **1～3 條真實校準商品，每條約六張照片及使用者提供的 crystal_name**；價格、珠徑、SKU、stock、notes 可選。不要求現在提供正式 7～14 天 Batch。
 
-之後：7～14條照片＋名稱＋指定日期 → Batch → Grounding／Basis → 已確認Style → 三候選／Selected → Product QA／Style QA → Cover／Carousel／Preview → READY_FOR_REVIEW → 等使用者明確批准 → 才允許Hosting／Preflight／Schedule或Publish。
+照片 → Ingest／Photo QA → Grounding → Caption Basis → A商品貼合／B顏色意境／C風景／D極簡／E日常／F品牌 → Calibration Preview → CALIBRATION_READY_FOR_REVIEW → 等使用者選喜歡／不喜歡。
 
-目前 `approval_mode=true`、`auto_publish_without_approval=false`，production仍paused。第一篇真實測試需要日後另外批准、真實照片／Caption／帳號／Media ID驗證；這不是本次工程停止條件，亦不由校準批准替代。
+目前實際商品=0、Instagram POST=0、Media ID=無、CAPTION_STYLE_CALIBRATED=NO。approval_mode=true、auto_publish_without_approval=false、production paused。第一次實物 test publish 仍需日後單獨明確批准。
 
-**沒有需使用者完成的工程設定；現在只等1～3條校準商品照片與水晶名稱。**
-
-舊的實物發布驗收旗標 `READY_FOR_PHOTO_ONLY_WORKFLOW=NO`、`READY_FOR_BAOBAO_AUTOMATION=NO` 保留，直到日後明確批准的一篇實物test publish完成。本次三個YES表示Batch與Calibration機制已備妥，不代表偏好已選定、實物品質已驗證或可無審核發布。
+安全規則與排錯：[Multi-Brand Isolation / Safety](multi-brand-isolation.md)。日常操作：[使用說明](baobao-automation.md)；第一組照片格式：[校準說明](baobao-caption-calibration.md)。

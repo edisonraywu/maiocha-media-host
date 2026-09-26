@@ -259,3 +259,13 @@ GitHub PAT 權限目前已修正，可部署 workflows、操作 Actions 和 Secr
 - 明確 FAILED 且沒有不確定 publish intent 才可 `retry ID`，最多兩次。`--force-republish` 不是修復逾時的方法。
 
 Reels／Stories 暫未為 baobao 啟用，不影響 Feed／Carousel；原 maiocha 入口與內容保持原樣。
+
+## Multi-Brand Isolation / Safety
+
+兩品牌共用 GitHub／Pages，內容、Caption Style、Approval、排程、帳號及發布歷史分開。maiocha 舊路徑保留，baobao 使用 `content/baobao/` 與 `media/baobao/{content_id}/`。
+
+Hosting 寫入／刪除／清理受品牌與 Campaign 邊界限制。快取完整綁定來源、hash、URL、object key 與 namespace；改 URL 不能沿用舊驗證。通用發布入口必須明確指定 `-Brand`，不會預設 baobao。
+
+遇到範圍或版本不一致，請讓 Codex 查看錯誤與對應項目，不要手動搬動商品、刪快取或繞過檢查。[詳細安全規則與排錯](multi-brand-isolation.md)。
+
+production 保持 paused。先收 1～3 條校準商品，六種文案 Preview 完成後等待你的風格回饋；這不會授權發文。

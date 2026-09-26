@@ -2,9 +2,9 @@ name: Multi-brand automation checks
 on:
   push:
     branches: [main]
-    paths: ['automation/**', 'tests/**', 'config/**', 'requirements-automation.txt', '.github/workflows/**']
+    paths: ['automation/**', 'tests/**', 'config/**', 'safety/**', 'legacy/**', 'requirements-automation.txt', '.github/workflows/**']
   pull_request:
-    paths: ['automation/**', 'tests/**', 'config/**', 'requirements-automation.txt', '.github/workflows/**']
+    paths: ['automation/**', 'tests/**', 'config/**', 'safety/**', 'legacy/**', 'requirements-automation.txt', '.github/workflows/**']
   workflow_dispatch:
 permissions:
   contents: read
@@ -21,4 +21,22 @@ jobs:
           cache-dependency-path: requirements-automation.txt
       - run: python -m pip install -r requirements-automation.txt
       - run: python -m unittest discover -s tests -v
-
+  legacy-hosting-isolation:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check actual PowerShell hosting and launcher boundaries with fixtures
+        shell: pwsh
+        run: ./safety/tests/Test-Isolation.ps1 -OutputRoot .local/isolation-regression
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: isolation-security-${{ matrix.os }}
+          path: |
+            .local/isolation-regression/isolation-tests.json
+            .local/isolation-regression/maiocha-regression/V2狀態機測試.json

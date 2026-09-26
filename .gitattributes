@@ -3,4 +3,5 @@
 *.yaml text eol=lf
 *.md text eol=lf
 *.json text eol=lf
-
+# Preserve deployed PowerShell bytes: installation verifies exact source/preimage hashes.
+*.ps1 -text
