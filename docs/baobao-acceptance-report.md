@@ -1,6 +1,6 @@
 # 寶寶礦到了｜Meta 接入完成，等待第一組真實商品
 
-更新：2026-09-26T17:41:49+08:00。
+更新：2026-09-26T17:49:40+08:00。
 
 **READY_FOR_PHOTO_ONLY_WORKFLOW = NO**
 
@@ -16,21 +16,21 @@ BLOCKERS:
 
 ## A. GitHub
 
-既有 GitHub deployment PASS；本次 Meta 接入修正與已驗證帳號設定正在部署。
+**PASS。**已將原 commits 加上 Meta 接入修正與真實帳號設定推送至同一 repository 的 main。程式 commit：`5188ba8e0f5029b59f8d944c6bb201620fa4ca2b`。後續報告 commit 僅更新驗收文件。沒有 force push、回滾或新建專案。
 
 沿用 edisonraywu/maiocha-media-host。只部署 baobao／共用 Python 功能、品牌設定、測試、workflow 與文件。部署前掃描 tracked／待提交檔案及新增 commits，禁止 .env、DPAPI、Token 入庫。
 
 ## B. Actions
 
-既有 CI 已 PASS；本次 70 項測試與已固定帳號設定的遠端驗證待完成。
+**PASS。**本次程式 commit `5188ba8e0f5029b59f8d944c6bb201620fa4ca2b` 的 [GitHub CI](https://github.com/edisonraywu/maiocha-media-host/actions/runs/36233762750) 已成功。原 57 項覆蓋延伸至本機 70 項，遠端亦執行同一份測試。
 
-既有空內容 Dry Run 已 PASS；本次使用完整 Secrets 的雲端唯讀帳號驗證待完成。
+**帳號與空內容 Dry Run PASS。**[手動 Dry Run](https://github.com/edisonraywu/maiocha-media-host/actions/runs/36233793937) 在 GitHub runner 實際使用四個 Secrets 查詢 Meta，account_safety_gate=PASS、四項 secret_presence=true、paused=true、production_ready=false、NO_DUE_CONTENT、api_post_requests_sent=0。這不是實物貼文的完整 Dry Run。
 
 baobao 有獨立 concurrency、BAOBAO Secrets、config、releases 與 state/baobao.json，不呼叫原 maiocha publisher。原 repo 沒有 maiocha Instagram workflow；不能宣稱執行不存在的 workflow。手動 Dry Run 新增唯讀帳號檢查，排程仍只發布既有、已明確批准的內容，不生成文案。
 
 ## C. Pages
 
-原 GitHub Pages 正常；本次原 maiocha 圖片公開 GET 為 200、image/jpeg，SHA256 相符。本次 code 的 Pages deployment 待完成。
+**PASS。**同一 Hosting 的 [Pages deployment](https://github.com/edisonraywu/maiocha-media-host/actions/runs/36233762400) 成功。原 maiocha 圖片公開 GET 為 200、image/jpeg，SHA256 相符。尚無 baobao 真實商品可驗證公開圖片 URL。
 
 ## D. Meta authorization
 
