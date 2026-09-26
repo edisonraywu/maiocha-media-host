@@ -41,17 +41,18 @@ class FixtureGenerator:
                     'perceived_brightness': '中等', 'visual_transparency_appearance': '不透明感',
                     'visible_surface_appearance': '照片表面有局部亮點', 'visible_patterns': ['白色區塊'],
                     'visual_contrast': '中', 'overall_visual_tone': '偏冷', 'photo_lighting': '柔和側光',
-                    'wearing_scene': '沒有上手', 'visual_keywords': ['藍', '白', '側光']},
+                    'wearing_scene': '沒有上手', 'photo_type': ['全貌', '平放'], 'visual_keywords': ['藍', '白', '側光']},
                 facts=[{'fact_id': 'blue', 'description': '商品可見藍色', 'evidence_photo_ids': ids},
                        {'fact_id': 'white', 'description': '有白色區塊', 'evidence_photo_ids': ids}],
                 photo_reviews=[{'photo_id': k, 'usable': not self.unusable, 'issues': [], 'composition': '全貌',
                    'dominant_colors': ['藍'], 'lighting': '側光', 'colour_reliable': True, 'wearing': False,
-                   'close_up': False, 'full_view': True, 'cover_score': 80, 'product_count': 1, 'same_product': True} for k in ids],
+                   'close_up': False, 'full_view': True, 'flat_lay': True, 'cover_score': 80, 'product_count': 1, 'same_product': True} for k in ids],
                 selected_photo_ids=ids[:10], issues=[])
         if stage == 'basis':
             return dict(base, dominant_color=['藍'], secondary=['白'], light='側光', visual_mood=['偏冷'],
                 user_provided_crystal=payload['user_provided']['crystal_name'], candidate_imagery=['雨後'],
-                rejected_imagery=['夕陽'], reason='照片中藍白相間，光偏冷。', evidence_fact_ids=['blue', 'white'], content_style='商品主角')
+                rejected_imagery=['夕陽'], reason='照片中藍白相間，光偏冷。', evidence_fact_ids=['blue', 'white'],
+                user_provided_facts=[], unknown_facts=[], content_style='商品主角')
         if stage == 'captions':
             word = '綠' if self.wrong_colour else '藍'
             captions = [f'這一串的{word}，和白色交錯。\n今天想多看它一眼。',
@@ -153,7 +154,7 @@ class PipelineTests(unittest.TestCase):
 
     def release(self, count=1):
         item = self.prepared(count)
-        self.assertEqual(item['status'], 'READY')
+        self.assertEqual(item['status'], 'READY_FOR_REVIEW')
         item['publish_at'] = (datetime.now(timezone.utc) + timedelta(days=1)).isoformat()
         save_json(item_dir(self.content, item['content_id']) / 'item.json', item)
         approve(self.content, item, self.config)
@@ -168,7 +169,7 @@ class PipelineTests(unittest.TestCase):
         grounding = read_json(item_dir(self.content, item['content_id']) / 'product_grounding.json')
         self.assertEqual(grounding['user_provided']['crystal_name'], None)
         self.assertIn('price', grounding['unknown_fields'])
-        self.assertEqual(item['status'], 'READY')
+        self.assertEqual(item['status'], 'READY_FOR_REVIEW')
         report = check_prepared(self.content, item)
         self.assertEqual(report['result'], 'PASS')
 
@@ -234,7 +235,7 @@ class PipelineTests(unittest.TestCase):
             self.product(f'product-{index:02d}')
         gen = FixtureGenerator()
         rows = prepare(self.content, self.config, lambda: gen)
-        self.assertEqual(sum(x['status'] == 'READY' for x in rows), 20)
+        self.assertEqual(sum(x['status'] == 'READY_FOR_REVIEW' for x in rows), 20)
         first = plan_calendar(self.content, self.config, datetime(2026, 10, 1, tzinfo=timezone.utc))
         second = plan_calendar(self.content, self.config, datetime(2026, 10, 1, tzinfo=timezone.utc))
         self.assertEqual(first, second)

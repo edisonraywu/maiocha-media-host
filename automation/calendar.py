@@ -18,7 +18,8 @@ def calendar_rows(content: Path) -> list[dict]:
         rows.append({'content_id': item['content_id'], 'brand': item['brand'], 'publish_at': item.get('publish_at'),
                      'content_type': item.get('content_type'),
                      'asset_paths': [f'items/{item["content_id"]}/' + photos[k]['processed_path'] for k in item.get('selected_photo_ids', [])],
-                     'caption_path': f'items/{item["content_id"]}/selected_caption.txt', 'status': item['status']})
+                     'caption_path': f'items/{item["content_id"]}/selected_caption.txt', 'status': item['status'],
+                     'schedule_state': 'SCHEDULED' if item['status'] == 'SCHEDULED' else 'PROPOSED_SCHEDULE'})
     return sorted(rows, key=lambda x: (x['publish_at'] or '9999', x['content_id']))
 
 
@@ -46,7 +47,7 @@ def plan_calendar(content: Path, config: dict, start: datetime | None = None):
     scheduled = [x for x in items if x.get('publish_at') and x['status'] != 'CANCELLED']
     occupied = {parse_time(x['publish_at']).astimezone(zone) for x in scheduled}
     counts = Counter((t.isocalendar().year, t.isocalendar().week) for t in occupied)
-    pending = [x for x in items if not x.get('publish_at') and x['status'] == 'READY']
+    pending = [x for x in items if not x.get('publish_at') and x['status'] == 'READY_FOR_REVIEW']
     history = sorted(scheduled, key=lambda x: x['publish_at'])[-5:]
     def penalty(item):
         score = 0

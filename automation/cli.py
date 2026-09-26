@@ -19,7 +19,7 @@ from .network import MetaClient
 from .operations import host, reconcile, schedule_batch, sync_archive, verify_test
 from .pipeline import check_prepared, prepare
 from .preview import render_preview
-from .publisher import Publisher, preflight
+from .publisher import Publisher, preflight, preview_preflight
 from .release import approve, stage_release
 
 
@@ -29,9 +29,9 @@ def parser():
     p.add_argument('--workspace', type=Path, default=REPO.parent)
     p.add_argument('--repo', type=Path, default=REPO)
     sub = p.add_subparsers(dest='command', required=True)
-    for name in ('ingest', 'prepare', 'preview', 'calendar', 'status', 'host', 'init-journal', 'pause', 'resume', 'sync', 'doctor', 'due'):
+    for name in ('ingest', 'prepare', 'preview', 'calendar', 'status', 'host', 'init-journal', 'pause', 'resume', 'sync', 'doctor', 'due', 'secrets-sync', 'validate'):
         sub.add_parser(name)
-    for name in ('approve', 'stage', 'preflight', 'schedule', 'cancel'):
+    for name in ('approve', 'stage', 'preflight', 'preview-preflight', 'schedule', 'cancel'):
         s = sub.add_parser(name)
         s.add_argument('content_id', nargs='?')
         s.add_argument('--all', action='store_true')
@@ -49,6 +49,12 @@ def parser():
     reschedule.add_argument('publish_at', help='2026-10-01T20:00:00+08:00')
     edit = sub.add_parser('review-caption')
     edit.add_argument('content_id')
+    revise = sub.add_parser('revise')
+    revise.add_argument('content_id')
+    revise.add_argument('--instructions', required=True)
+    reorder = sub.add_parser('reorder')
+    reorder.add_argument('content_id')
+    reorder.add_argument('photo_ids', nargs='+', help='依 Preview 所列 photo_id 排列，只處理這件商品')
     mode = sub.add_parser('mode')
     mode.add_argument('value', choices=['approval', 'auto'])
     verify = sub.add_parser('verify-test')
@@ -86,7 +92,7 @@ def run(args):
         return data
     def targets():
         if getattr(args, 'all', False):
-            return [read_json(p) for p in item_files(content) if read_json(p)['status'] in ('READY', 'APPROVED', 'SCHEDULED')]
+            return [read_json(p) for p in item_files(content) if read_json(p)['status'] in ('READY_FOR_REVIEW', 'APPROVED', 'SCHEDULED')]
         if not getattr(args, 'content_id', None):
             raise Blocked('CONTENT_ID_OR_ALL_REQUIRED')
         return [item(args.content_id)]
@@ -96,6 +102,18 @@ def run(args):
                 'inbox_products': len([p for p in (content / 'inbox').glob('*') if p.is_dir()]),
                 'approval_mode': config['approval_mode'], 'posting': config['posting'],
                 'production_ready': False if missing else 'RUN_LIVE_PREFLIGHT', 'paid_api_enabled': False}
+    if command == 'validate':
+        state, _ = journal().read()
+        return {'result': 'VALIDATION_PASS', 'brand': config['brand'], 'approval_mode': config['approval_mode'],
+                'auto_publish_without_approval': False, 'journal_access': 'PASS', 'paused': state['paused'],
+                'production_ready': state['production_ready'],
+                'secret_presence': {name: bool(os.environ.get(name)) for name in config['env'].values()},
+                'api_post_requests_sent': 0, 'note': '驗證設定與持久紀錄可讀；不代表 Meta 帳號已授權或已完成實物驗收。'}
+    if command == 'secrets-sync':
+        from .secret_setup import sync_secrets
+        result = sync_secrets(config)
+        save_json(content / 'github-secret-verification.json', result)
+        return result
     if command == 'ingest':
         result = ingest(content, args.brand)
         render_preview(content, config)
@@ -111,14 +129,12 @@ def run(args):
                     revoke_scheduled(journal(), old['content_id'])
         results = prepare(content, config, lambda: CodexBatchGenerator(config['generator']['timeout_seconds']))
         plan_calendar(content, config)
-        scheduling = None
-        if not config['approval_mode']:
-            selection = [read_json(p) for p in item_files(content) if read_json(p)['status'] == 'READY']
-            scheduling = schedule_batch(repo, workspace, content, config, selection, journal()) if selection else []
-            results = [read_json(p) for p in item_files(content)]
+        results = [read_json(p) for p in item_files(content)]
+        reports = [preview_preflight(repo, content, x, config) for x in results if x['status'] == 'READY_FOR_REVIEW']
         path = render_preview(content, config)
         return {'items': [{'content_id': x['content_id'], 'status': x['status'], 'errors': x.get('prepare_errors', [])} for x in results],
-                'preview': str(path), 'count': len(results), 'scheduling': scheduling}
+                'preview': str(path), 'count': len(results), 'scheduling': None, 'approval_granted': False,
+                'preview_preflight': reports, 'message': '內容準備後停在 READY_FOR_REVIEW；等你明確批准。'}
     if command == 'preview':
         return {'preview': str(render_preview(content, config))}
     if command == 'calendar':
@@ -128,9 +144,12 @@ def run(args):
     if command == 'status':
         return {'brand': args.brand, 'items': [{k: read_json(p).get(k) for k in ('content_id', 'status', 'publish_at', 'instagram_media_id')} for p in item_files(content)]}
     if command == 'mode':
-        config['approval_mode'] = args.value == 'approval'
+        if args.value != 'approval':
+            raise Blocked('AUTO_PUBLISH_DISABLED_REQUIRES_EXPLICIT_APPROVAL')
+        config['approval_mode'] = True
+        config['auto_publish_without_approval'] = False
         atomic_bytes(repo / 'config/brands' / (args.brand + '.yaml'), yaml.safe_dump(config, allow_unicode=True, sort_keys=False).encode('utf-8'))
-        return {'approval_mode': config['approval_mode'], 'note': 'host 會同步此設定；auto 仍需圖片 QA、線上 preflight 與成功測試。'}
+        return {'approval_mode': True, 'auto_publish_without_approval': False}
     if command in ('pause', 'resume'):
         def change(state):
             state['paused'] = command == 'pause'
@@ -157,10 +176,10 @@ def run(args):
         # Cancel any already deployed old schedule before changing local state.
         if (repo / 'releases' / args.brand / data['content_id'] / 'release.json').exists():
             revoke_scheduled(journal(), data['content_id'])
-        data.update({'publish_at': args.publish_at, 'approval': None, 'status': 'READY'})
+        data.update({'publish_at': args.publish_at, 'approval': None, 'approval_state': 'PENDING', 'status': 'READY_FOR_REVIEW'})
         save_json(item_dir(content, data['content_id']) / 'item.json', data)
         render_preview(content, config)
-        return {'content_id': data['content_id'], 'status': 'READY', 'note': '日期已修改，請重新核准、stage、host、schedule。'}
+        return {'content_id': data['content_id'], 'status': 'READY_FOR_REVIEW', 'schedule_state': 'PROPOSED_SCHEDULE', 'note': '僅修改建議日期；需重新明確核准。'}
     if command == 'cancel':
         results = []
         for data in targets():
@@ -168,6 +187,7 @@ def run(args):
                 revoke_scheduled(journal(), data['content_id'])
             data['status'] = 'CANCELLED'
             data['approval'] = None
+            data['approval_state'] = 'PENDING'
             save_json(item_dir(content, data['content_id']) / 'item.json', data)
             results.append({'content_id': data['content_id'], 'status': 'CANCELLED'})
         render_preview(content, config)
@@ -182,6 +202,22 @@ def run(args):
         result = review_caption(content, data, config, CodexBatchGenerator(config['generator']['timeout_seconds']))
         render_preview(content, config)
         return {'content_id': data['content_id'], 'status': result['status'], 'errors': result.get('prepare_errors')}
+    if command in ('revise', 'reorder'):
+        from .pipeline import revise_one
+        data = item(args.content_id)
+        if data.get('release_hash'):
+            revoke_scheduled(journal(), data['content_id'])
+        result = revise_one(content, data, config, CodexBatchGenerator(config['generator']['timeout_seconds']),
+                            instructions=args.instructions if command == 'revise' else '',
+                            photo_ids=args.photo_ids if command == 'reorder' else None)
+        if result['status'] == 'READY_FOR_REVIEW':
+            preview_preflight(repo, content, result, config)
+        render_preview(content, config)
+        return {'content_id': result['content_id'], 'status': result['status'], 'errors': result.get('prepare_errors'), 'approval_granted': False}
+    if command == 'preview-preflight':
+        result = [preview_preflight(repo, content, x, config) for x in targets()]
+        render_preview(content, config)
+        return result
     if command == 'schedule':
         results = schedule_batch(repo, workspace, content, config, targets(), journal(), test_only=args.test)
         render_preview(content, config)

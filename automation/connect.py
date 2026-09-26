@@ -22,8 +22,10 @@ def bind(expected_username: str, workspace: Path, repo=REPO, transport=None):
         raise Blocked('BAOBAO_USERNAME_REQUIRED')
     net = transport or Transport()
     root = 'https://graph.facebook.com/' + config['api_version'] + '/'
-    # If the existing App Secret is available, exchange the newly authorized user token first.
+    # Exchange against the existing App to prove the new authorization belongs to that App.
     app_secret = os.environ.get('BAOBAO_SETUP_APP_SECRET')
+    if not app_secret:
+        raise Blocked('EXISTING_META_APP_SECRET_REQUIRED', manual=True)
     if app_secret:
         exchanged = net.json('GET', root + 'oauth/access_token?' + urlencode({
             'grant_type': 'fb_exchange_token', 'client_id': config['meta_app_id'],
@@ -31,6 +33,11 @@ def bind(expected_username: str, workspace: Path, repo=REPO, transport=None):
         user_token = exchanged.get('access_token', '')
         if not user_token:
             raise Blocked('LONG_LIVED_TOKEN_EXCHANGE_FAILED', manual=True)
+    permission_response = net.json('GET', root + 'me/permissions', headers={'Authorization': 'Bearer ' + user_token})
+    granted = {p.get('permission') for p in permission_response.get('data', []) if p.get('status') == 'granted'}
+    required = {'pages_show_list', 'pages_read_engagement', 'instagram_basic', 'instagram_content_publish'}
+    if not required <= granted:
+        raise Blocked('META_REQUIRED_PERMISSIONS_NOT_GRANTED', manual=True)
     pages = net.json('GET', root + 'me/accounts?' + urlencode({'fields': 'id,name,access_token,instagram_business_account{id,username}', 'limit': 100}),
                      headers={'Authorization': 'Bearer ' + user_token})
     candidates = [p for p in pages.get('data', []) if p.get('instagram_business_account', {}).get('username', '').casefold() == expected_username.casefold()]
@@ -47,6 +54,7 @@ def bind(expected_username: str, workspace: Path, repo=REPO, transport=None):
         raise Blocked('PAGE_TOKEN_NOT_GRANTED', manual=True)
     config['target'] = target
     verified = MetaClient(config, creds, net).verify_account()
+    verified['granted_permissions'] = sorted(required)
     # Persist only after a live Page→IG and username check.
     destination = workspace / 'content/baobao/.env'
     text = '\n'.join(config['env'][k] + '=' + str(v) for k, v in creds.items()) + '\n'
@@ -70,4 +78,3 @@ if __name__ == '__main__':
     except Exception:
         print('ACCOUNT_BINDING_FAILED_NO_CREDENTIALS_EXPOSED')
         raise SystemExit(3)
-

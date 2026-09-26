@@ -154,17 +154,17 @@ class SchedulingRaceTests(fixtures.PipelineTests):
         self.assertEqual(reports[0]['result'], 'PASS')
         self.assertEqual(self.state.state['queue'], {})
 
-    def test_auto_mode_still_requires_image_qa_and_online_checks(self):
+    def test_auto_mode_cannot_schedule_without_explicit_approval(self):
         from automation.operations import schedule_batch
         from test_automation import HostedFiles
         from datetime import datetime, timezone, timedelta
         self.config['approval_mode'] = False
         item = self.prepared()
         item['publish_at'] = (datetime.now(timezone.utc) + timedelta(days=1)).isoformat()
-        reports = schedule_batch(self.repo, self.root, self.content, self.config, [item], self.state,
-            meta=FakeMeta(), transport=HostedFiles(self.repo, self.config), host_action=lambda: None)
-        self.assertEqual(reports[0]['result'], 'PASS')
-        self.assertEqual(self.state.state['queue'][item['content_id']]['status'], 'SCHEDULED')
+        with self.assertRaisesRegex(Blocked, 'EXPLICIT_APPROVAL_REQUIRED'):
+            schedule_batch(self.repo, self.root, self.content, self.config, [item], self.state,
+                meta=FakeMeta(), transport=HostedFiles(self.repo, self.config), host_action=lambda: self.fail('Must not host'))
+        self.assertEqual(self.state.state['queue'], {})
 
 
 # unittest normally inherits base test methods; keep this class limited to its two added cases.

@@ -45,7 +45,8 @@ content_style 根據商品；沒有上手照不選上手日常；沒有新品資
 source=user_provided 的 references 是欄位名；source=visual 是 grounding fact_id；imagery 引用 basis candidate_imagery。
 不得在形容或hashtag中偷偷猜礦種/功效/價格。沒有商品名則用這一串/這條素串。
 不用強制規格表或空泛CTA；適度使用核心句「寶寶，你的礦到了。」但不每篇同hook。
-每版須含至少一個真實可見的具體特徵，無根據不要補齊。''',
+每版須含至少一個真實可見的具體特徵，無根據不要補齊。
+如果有 user_revision_request，只修改這件商品的文案風格或長度；不得因此改寫 grounding 或創造事實。''',
     'qa': '''你現在是獨立審核者。重新看這些實際照片；不要因生成器宣稱PASS就同意。
 核對caption每一個具體陳述、顏色、光、透明/表面、礦名、價錢、珠徑、意境和商品；核對content_id。
 沒有user_provided的正式商品事實不得通過；沒寫某項資訊視為該檢查通過。

@@ -105,6 +105,8 @@ class LocalTestJournal:
 
 
 def claim(journal, release: dict, test_only=False, force=False, due=False) -> str:
+    from .release import require_approved_release
+    require_approved_release(release)
     owner = uuid.uuid4().hex
     cid = release['content_id']
     def change(state):
@@ -156,6 +158,8 @@ def revoke_scheduled(journal, cid):
 
 
 def schedule_release(journal, release):
+    from .release import require_approved_release
+    require_approved_release(release)
     def change(state):
         cid = release['content_id']
         if cid in state['items']:

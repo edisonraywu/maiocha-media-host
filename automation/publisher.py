@@ -7,7 +7,49 @@ from pathlib import Path
 from .core import Blocked, credentials, now, parse_time, save_json
 from .journal import claim, update_attempt
 from .network import ApiFailure, MetaClient, Transport
-from .release import validate_release, verify_hosted
+from .release import require_approved_release, validate_release, verify_hosted
+
+
+def preview_preflight(repo: Path, content: Path, item: dict, config: dict, meta=None, transport=None):
+    """Read-only review readiness. This never creates approval, a queue entry or a Meta container."""
+    from .pipeline import check_prepared
+    from .core import item_dir, read_json
+    checks, failures = {}, []
+    try:
+        check_prepared(content, item)
+        if item['brand'] != config['brand'] or not item['content_id'].startswith(config['brand'] + '-'):
+            raise Blocked('REVIEW_BRAND_MISMATCH')
+        if config['hosting']['namespace'] != 'media/' + config['brand']:
+            raise Blocked('ASSET_NAMESPACE_MISMATCH')
+        checks['product_caption_qa_assets'] = 'PASS'
+    except Blocked as error:
+        checks['product_caption_qa_assets'] = 'FAIL'
+        failures.append(error.code)
+    try:
+        creds = credentials(config)
+        (meta or MetaClient(config, creds)).verify_account()
+        checks['account'] = 'PASS'
+    except Blocked as error:
+        checks['account'] = 'MANUAL_ACTION_REQUIRED' if error.manual else 'FAIL'
+        failures.append(error.code)
+    pack = read_json(repo / 'releases' / config['brand'] / item['content_id'] / 'release.json')
+    checks['hosting'] = 'PENDING_EXPLICIT_APPROVAL'
+    if pack and pack.get('input_hash') == item.get('input_hash') and pack.get('qa', {}).get('local_report_hash') == item.get('qa_hash'):
+        try:
+            validate_release(repo, pack, config)
+            verify_hosted(pack, transport or Transport())
+            checks['hosting'] = 'PASS'
+        except Blocked as error:
+            checks['hosting'] = 'FAIL'
+            failures.append(error.code)
+    result = 'FAIL' if any(v == 'FAIL' for v in checks.values()) else ('MANUAL_ACTION_REQUIRED' if failures else
+             ('PASS' if checks['hosting'] == 'PASS' else 'AWAITING_APPROVAL_FOR_PUBLIC_HOSTING'))
+    report = {'stage': 'PREVIEW_PREFLIGHT', 'brand': config['brand'], 'content_id': item['content_id'],
+              'target': config['target'], 'checks': checks, 'failures': failures, 'result': result,
+              'asset_namespace': config['hosting']['namespace'] + '/' + item['content_id'] + '/',
+              'approval_granted': False, 'api_post_requests_sent': 0, 'checked_at': now()}
+    save_json(item_dir(content, item['content_id']) / 'preview_preflight.json', report)
+    return report
 
 
 def preflight(repo: Path, release: dict, config: dict, journal, meta=None, transport=None, *, test_only=False, force=False, due=False) -> dict:
@@ -28,6 +70,7 @@ def preflight(repo: Path, release: dict, config: dict, journal, meta=None, trans
             checks[name] = False
             failures.append({'check': name, 'code': 'INVALID_OR_MISSING_INPUT'})
             return None
+    check('explicit_manual_approval', lambda: require_approved_release(release))
     check('brand_manifest_assets_caption_qa', lambda: validate_release(repo, release, config))
     creds = check('credentials_match_pinned_target', lambda: credentials(config))
     def history():
@@ -75,7 +118,7 @@ def preflight(repo: Path, release: dict, config: dict, journal, meta=None, trans
         check('live_page_ig_username_permissions', lambda: (meta or MetaClient(config, creds)).verify_account())
     else:
         checks['live_page_ig_username_permissions'] = False
-    return {'brand': config['brand'], 'content_id': release.get('content_id'), 'checked_at': now(),
+    return {'stage': 'PUBLISH_PREFLIGHT', 'brand': config['brand'], 'target': config['target'], 'content_id': release.get('content_id'), 'checked_at': now(),
             'result': ('MANUAL_ACTION_REQUIRED' if manual else 'FAIL') if failures else 'PASS',
             'checks': checks, 'failures': failures, 'api_post_requests_sent': 0, 'is_test': test_only}
 
@@ -104,6 +147,7 @@ class Publisher:
         raise Blocked('STORY_REQUIRES_ACCOUNT_CAPABILITY_VALIDATION', manual=True)
 
     def publish(self, release, *, dry_run=False, test_only=False, force=False, due=False):
+        require_approved_release(release)
         if test_only and release['content_type'] != 'SINGLE':
             raise Blocked('FIRST_TEST_MUST_BE_ONE_FEED_IMAGE')
         report = preflight(self.repo, release, self.config, self.journal, self.meta, self.transport,

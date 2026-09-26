@@ -14,7 +14,7 @@ import yaml
 
 REPO = Path(__file__).resolve().parents[1]
 BRANDS = frozenset({'baobao', 'maiocha'})
-STATES = frozenset({'DRAFT', 'NEEDS_INFO', 'READY', 'APPROVED', 'SCHEDULED', 'PUBLISHING',
+STATES = frozenset({'DRAFT', 'PREPARED', 'NEEDS_INFO', 'READY', 'READY_FOR_REVIEW', 'APPROVED', 'SCHEDULED', 'PUBLISHING',
                     'PUBLISHED', 'FAILED', 'MANUAL_ACTION_REQUIRED', 'CANCELLED'})
 PRODUCT_FIELDS = ('product_name', 'crystal_name', 'price', 'bead_size', 'stock', 'sku', 'notes')
 ID_RE = re.compile(r'^[a-zA-Z0-9][a-zA-Z0-9_-]{0,79}$')
@@ -107,6 +107,8 @@ def brand_config(brand: str, repo: Path = REPO) -> dict:
     data = read_yaml(repo / 'config' / 'brands' / f'{brand}.yaml')
     if data.get('brand') != brand or data.get('hosting', {}).get('namespace') != f'media/{brand}':
         raise Blocked('BRAND_CONFIG_MISMATCH')
+    if brand == 'baobao' and (data.get('approval_mode') is not True or data.get('auto_publish_without_approval', False) is not False):
+        raise Blocked('BAOBAO_REQUIRES_EXPLICIT_MANUAL_APPROVAL')
     other = read_yaml(repo / 'config' / 'brands' / f'{"maiocha" if brand == "baobao" else "baobao"}.yaml')
     for key in ('instagram_user_id', 'facebook_page_id', 'username'):
         value = data['target'].get(key)
@@ -201,4 +203,3 @@ def cancel_approval(item: dict) -> None:
     item.pop('release_hash', None)
     item['status'] = 'DRAFT'
     item['updated_at'] = now()
-

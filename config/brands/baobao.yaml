@@ -14,6 +14,7 @@ env:
   username: BAOBAO_IG_USERNAME
   token: BAOBAO_PAGE_ACCESS_TOKEN
 approval_mode: true
+auto_publish_without_approval: false
 paused: true
 posting:
   timezone: Asia/Taipei
@@ -54,4 +55,3 @@ brand_voice:
     貓咪品牌元素: 僅可使用使用者提供的該隻貓照片，不得生成替身。
     已查證小知識: 必須有使用者確認的資料與可靠來源。
   imagery: [清晨, 天空, 海風, 雨後, 雲, 晚霞, 森林, 樹影, 月光, 晨霧, 冬日陽光, 秋天, 琥珀光, 窗邊, 風, 夜色, 深海, 日常]
-

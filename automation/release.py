@@ -19,36 +19,36 @@ def approval_fingerprint(item: dict, config: dict):
 
 
 def approve(content: Path, item: dict, config: dict):
-    if item['status'] not in ('READY', 'APPROVED', 'SCHEDULED'):
+    if item['status'] not in ('READY_FOR_REVIEW', 'APPROVED', 'SCHEDULED'):
         raise Blocked('ITEM_NOT_READY')
     check_prepared(content, item)
     if not item.get('publish_at'):
         raise Blocked('SET_CALENDAR_FIRST')
     if not all(config['target'].values()):
         raise Blocked('TARGET_NOT_PINNED', manual=True)
-    if (item.get('approval') or {}).get('mode') == 'manual' and item['approval'].get('fingerprint') == approval_fingerprint(item, config):
+    if (item.get('approval') or {}).get('mode') == 'manual' and item.get('approval_state') == 'APPROVED' and item['approval'].get('state') == 'APPROVED' and item['approval'].get('source') == 'explicit_approval_command' and item['approval'].get('fingerprint') == approval_fingerprint(item, config):
         return item
-    item['approval'] = {'mode': 'manual', 'approved_at': now(), 'fingerprint': approval_fingerprint(item, config)}
+    item['approval'] = {'mode': 'manual', 'state': 'APPROVED', 'source': 'explicit_approval_command',
+                        'approved_at': now(), 'fingerprint': approval_fingerprint(item, config)}
+    item['approval_state'] = 'APPROVED'
     item['status'] = 'APPROVED'
     save_json(item_dir(content, item['content_id']) / 'item.json', item)
     return item
 
 
 def build_release(content: Path, item: dict, config: dict) -> dict:
+    if item.get('status') not in ('APPROVED', 'SCHEDULED') or item.get('approval_state') != 'APPROVED':
+        raise Blocked('EXPLICIT_APPROVAL_REQUIRED')
     report = check_prepared(content, item)
     if item['brand'] != config['brand']:
         raise Blocked('BRAND_MISMATCH')
     if not all(config['target'].values()):
         raise Blocked('TARGET_NOT_PINNED', manual=True)
     parse_time(item.get('publish_at'))
-    if config['approval_mode']:
-        approval = item.get('approval') or {}
-        if approval.get('mode') != 'manual' or approval.get('fingerprint') != approval_fingerprint(item, config):
-            raise Blocked('APPROVAL_MISSING_OR_STALE')
-    else:
-        approval = item.get('approval') or {}
-        if approval.get('mode') != 'auto' or approval.get('fingerprint') != approval_fingerprint(item, config):
-            approval = {'mode': 'auto', 'approved_at': now(), 'fingerprint': approval_fingerprint(item, config)}
+    approval = item.get('approval') or {}
+    if (approval.get('mode') != 'manual' or approval.get('state') != 'APPROVED' or
+            approval.get('fingerprint') != approval_fingerprint(item, config)):
+        raise Blocked('APPROVAL_MISSING_OR_STALE')
     folder = item_dir(content, item['content_id'])
     photos = {p['photo_id']: p for p in item['photos']}
     assets = []
@@ -71,7 +71,7 @@ def build_release(content: Path, item: dict, config: dict) -> dict:
                       'input_hash': item['input_hash'], 'caption_hash': report['caption_hash'],
                       'checks': report['checks'], 'local_report_hash': digest(report),
                       'selected_photo_ids': item['selected_photo_ids']},
-               'approval': approval, 'status': 'APPROVED'}
+               'approval': approval, 'approval_state': 'APPROVED', 'status': 'APPROVED'}
     release['release_hash'] = digest(release)
     secret_free(release)
     return release
@@ -97,7 +97,23 @@ def stage_release(repo: Path, content: Path, item: dict, config: dict):
     return release
 
 
+def require_approved_release(release: dict):
+    """Fail before any network call, including explicit test publication."""
+    approval = release.get('approval') or {}
+    if (release.get('status') not in ('APPROVED', 'SCHEDULED') or release.get('approval_state') != 'APPROVED' or
+            approval.get('mode') != 'manual' or approval.get('state') != 'APPROVED' or
+            approval.get('source') != 'explicit_approval_command' or not approval.get('approved_at')):
+        raise Blocked('EXPLICIT_APPROVAL_REQUIRED')
+    parse_time(approval['approved_at'])
+    fingerprint_item = {k: release.get(k) for k in ('brand', 'content_id', 'input_hash', 'content_type', 'publish_at')}
+    fingerprint_item.update(qa_hash=release.get('qa', {}).get('local_report_hash'),
+                            selected_photo_ids=[a.get('photo_id') for a in release.get('assets', [])])
+    if approval.get('fingerprint') != approval_fingerprint(fingerprint_item, {'target': release.get('target')}):
+        raise Blocked('APPROVAL_MISSING_OR_STALE')
+
+
 def validate_release(repo: Path, release: dict, config: dict):
+    require_approved_release(release)
     brand, cid = config['brand'], valid_id(release.get('content_id'))
     if release.get('schema_version') != 3 or release.get('brand') != brand or not cid.startswith(brand + '-'):
         raise Blocked('RELEASE_BRAND_MISMATCH')
@@ -115,11 +131,6 @@ def validate_release(repo: Path, release: dict, config: dict):
         raise Blocked('INVALID_MEDIA_COUNT')
     if len(release.get('source_asset_hashes', [])) != count or len(set(a.get('photo_id') for a in release['assets'])) != count:
         raise Blocked('INVALID_SOURCE_ASSET_BINDING')
-    approval = release.get('approval', {})
-    if config['approval_mode'] and approval.get('mode') != 'manual':
-        raise Blocked('MANUAL_APPROVAL_REQUIRED')
-    if approval.get('mode') not in ('manual', 'auto') or not approval.get('fingerprint'):
-        raise Blocked('APPROVAL_MISSING')
     qa = release.get('qa', {})
     if (qa.get('result') != 'PASS' or qa.get('brand') != brand or qa.get('content_id') != cid or
         qa.get('input_hash') != release.get('input_hash') or qa.get('caption_hash') != release.get('caption_sha256') or

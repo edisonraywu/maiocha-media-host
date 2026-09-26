@@ -34,8 +34,11 @@ def prepare_one(content: Path, item: dict, config: dict, generator, recent: list
         return item
     try:
         assert_current(content, item)
-        if item['status'] in ('READY', 'APPROVED', 'SCHEDULED'):
+        if item['status'] in ('READY', 'READY_FOR_REVIEW', 'APPROVED', 'SCHEDULED'):
             check_prepared(content, item)
+            if item['status'] == 'READY':
+                item.update(status='READY_FOR_REVIEW', approval=None, approval_state='PENDING')
+                save_json(folder / 'item.json', item)
             return item
     except Blocked:
         item.pop('approval', None)
@@ -63,7 +66,11 @@ def prepare_one(content: Path, item: dict, config: dict, generator, recent: list
         model_grounding = {k: v for k, v in grounding.items() if k not in ('brand', 'source_folder', 'user_provided', 'unknown_fields')}
         basis = generator.generate('basis', {**base, 'grounding': grounding}, images, work / 'basis')
         validate('basis', basis, item)
+        basis['user_provided_facts'] = [{'field': k, 'value': str(v)} for k, v in item['user_provided'].items() if v is not None]
+        basis['unknown_facts'] = list(grounding['unknown_fields'])
         save_json(folder / 'caption_basis.json', basis)
+        item.update(status='PREPARED', approval=None, approval_state='PENDING')
+        save_json(folder / 'item.json', item)
         previous_errors = []
         for attempt in range(2):
             captions = generator.generate('captions', {**base, 'grounding': grounding, 'caption_basis': basis,
@@ -86,13 +93,14 @@ def prepare_one(content: Path, item: dict, config: dict, generator, recent: list
             save_json(folder / 'caption_qa.json', report)
             atomic_bytes(folder / 'selected_caption.txt', selected['caption'].encode('utf-8'))
             if report['result'] == 'PASS':
-                item.update({'status': 'READY', 'content_type': 'SINGLE' if len(grounding['selected_photo_ids']) == 1 else 'CAROUSEL',
+                item.update({'status': 'READY_FOR_REVIEW', 'content_type': 'SINGLE' if len(grounding['selected_photo_ids']) == 1 else 'CAROUSEL',
                              'selected_photo_ids': grounding['selected_photo_ids'], 'content_style': basis['content_style'],
                              'cover_composition': next(p['composition'] for p in grounding['photo_reviews'] if p['photo_id'] == grounding['selected_photo_ids'][0]),
                              'colour_families': grounding['visual_observations']['dominant_colors'], 'hook': selected['hook'],
                              'caption_structure': selected['structure'], 'qa_hash': digest(report),
                              'prepare_errors': [], 'prepared_at': now()})
                 item['approval'] = None
+                item['approval_state'] = 'PENDING'
                 break
             previous_errors = report['errors']
             item.update({'status': 'NEEDS_INFO', 'prepare_errors': previous_errors})
@@ -136,10 +144,13 @@ def prepare(content: Path, config: dict, generator_factory) -> list[dict]:
         recent = []
         results = []
         for item in all_items:
-            needs_work = item['status'] in ('DRAFT', 'NEEDS_INFO') and not item.get('issues')
-            if item['status'] in ('READY', 'APPROVED', 'SCHEDULED'):
+            needs_work = item['status'] in ('DRAFT', 'PREPARED', 'NEEDS_INFO') and not item.get('issues')
+            if item['status'] in ('READY', 'READY_FOR_REVIEW', 'APPROVED', 'SCHEDULED'):
                 try:
                     check_prepared(content, item)
+                    if item['status'] == 'READY':
+                        item.update(status='READY_FOR_REVIEW', approval=None, approval_state='PENDING')
+                        save_json(item_dir(content, item['content_id']) / 'item.json', item)
                 except Blocked:
                     item['status'] = 'DRAFT'
                     needs_work = True
@@ -172,6 +183,7 @@ def review_caption(content: Path, item: dict, config: dict, generator):
             'photo_ids': [p['photo_id'] for p in item['photos']], 'grounding': grounding,
             'caption_basis': basis, 'manual_caption': manual, 'brand_voice': config['brand_voice']}
     item['approval'] = None
+    item['approval_state'] = 'PENDING'
     item['status'] = 'NEEDS_INFO'
     save_json(folder / 'item.json', item)
     captions = generator.generate('captions', base, images, folder / 'generation' / 'manual-caption')
@@ -189,7 +201,60 @@ def review_caption(content: Path, item: dict, config: dict, generator):
     save_json(folder / 'vision_qa.json', vision)
     save_json(folder / 'caption_qa.json', report)
     item['qa_hash'], item['prepare_errors'] = digest(report), report['errors']
-    item['status'] = 'READY' if report['result'] == 'PASS' else 'NEEDS_INFO'
+    item['status'] = 'READY_FOR_REVIEW' if report['result'] == 'PASS' else 'NEEDS_INFO'
     item['hook'], item['caption_structure'] = chosen['hook'], chosen['structure']
+    save_json(folder / 'item.json', item)
+    return item
+
+
+def revise_one(content: Path, item: dict, config: dict, generator, *, instructions: str = '', photo_ids: list[str] | None = None):
+    """Revise only this item; keep its original grounding/basis and every other product untouched."""
+    if item['status'] in ('PUBLISHED', 'PUBLISHING', 'MANUAL_ACTION_REQUIRED', 'CANCELLED'):
+        raise Blocked('IMMUTABLE_OR_UNCERTAIN_PRODUCT')
+    assert_current(content, item)
+    folder = item_dir(content, item['content_id'])
+    grounding = read_json(folder / 'product_grounding.json')
+    basis = read_json(folder / 'caption_basis.json')
+    if not grounding or not basis:
+        raise Blocked('PREPARATION_INCOMPLETE')
+    if photo_ids is not None:
+        valid = {p['photo_id'] for p in grounding['photo_reviews'] if p['usable'] and p['colour_reliable']}
+        if not photo_ids or len(photo_ids) > 10 or len(set(photo_ids)) != len(photo_ids) or not set(photo_ids) <= valid:
+            raise Blocked('INVALID_REVIEW_PHOTO_SELECTION')
+        grounding['selected_photo_ids'] = photo_ids
+        save_json(folder / 'product_grounding.json', grounding)
+    item.update(status='PREPARED', approval=None, approval_state='PENDING')
+    save_json(folder / 'item.json', item)
+    images = [inside(folder, p['processed_path']) for p in item['photos']]
+    base = {'content_id': item['content_id'], 'input_hash': item['input_hash'], 'user_provided': item['user_provided'],
+            'photo_ids': [p['photo_id'] for p in item['photos']], 'grounding': grounding,
+            'caption_basis': basis, 'brand_voice': config['brand_voice'], 'user_revision_request': instructions}
+    subset = {k: v for k, v in grounding.items() if k not in ('brand', 'source_folder', 'user_provided', 'unknown_fields')}
+    previous_errors = []
+    try:
+        for attempt in range(2 if instructions else 1):
+            captions = (generator.generate('captions', dict(base, fix_errors=previous_errors), images, folder / 'generation' / f'revision-{attempt}')
+                        if instructions else read_json(folder / 'caption_candidates.json'))
+            validate('captions', captions, item)
+            chosen = next(x for x in captions['candidates'] if x['key'] == captions['selected_key'])
+            from .core import text_hash
+            vision = generator.generate('qa', dict(base, caption=chosen['caption'], caption_hash=text_hash(chosen['caption']),
+                                        selected_photo_ids=grounding['selected_photo_ids']), images, folder / 'generation' / f'revision-qa-{attempt}')
+            report = qa_report(item, subset, basis, captions, vision)
+            report['grounding_hash'] = digest(grounding)
+            save_json(folder / 'caption_candidates.json', captions)
+            save_json(folder / 'vision_qa.json', vision)
+            save_json(folder / 'caption_qa.json', report)
+            atomic_bytes(folder / 'selected_caption.txt', chosen['caption'].encode('utf-8'))
+            item.update(qa_hash=digest(report), prepare_errors=report['errors'], selected_photo_ids=grounding['selected_photo_ids'],
+                        content_type='SINGLE' if len(grounding['selected_photo_ids']) == 1 else 'CAROUSEL',
+                        cover_composition=next(p['composition'] for p in grounding['photo_reviews'] if p['photo_id'] == grounding['selected_photo_ids'][0]),
+                        hook=chosen['hook'], caption_structure=chosen['structure'])
+            item['status'] = 'READY_FOR_REVIEW' if report['result'] == 'PASS' else 'NEEDS_INFO'
+            if report['result'] == 'PASS':
+                break
+            previous_errors = report['errors']
+    except Blocked as error:
+        item.update(status='NEEDS_INFO', prepare_errors=[error.code])
     save_json(folder / 'item.json', item)
     return item
