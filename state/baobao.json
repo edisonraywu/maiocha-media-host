@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "brand": "baobao",
+  "paused": true,
+  "production_ready": false,
+  "test_verification": null,
+  "items": {},
+  "history": [],
+  "queue": {},
+  "operation_id": "4ea26296054445a1ae5fd4a00b92977a"
+}
