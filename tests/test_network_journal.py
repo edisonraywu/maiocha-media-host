@@ -33,6 +33,19 @@ class Opener:
 
 
 class NetworkTests(unittest.TestCase):
+    def test_http_failure_retains_only_numeric_provider_diagnostics(self):
+        net = Transport(sleep=lambda _: None)
+        body = json.dumps({'error': {'code': 190, 'error_subcode': 463,
+                                    'message': 'SIMULATED_PRIVATE_TOKEN_AND_URL'}}).encode()
+        error = urllib.error.HTTPError('https://graph.facebook.com/private', 400, 'private', {}, io.BytesIO(body))
+        with patch.object(net.opener, 'open', side_effect=error):
+            with self.assertRaises(ApiFailure) as raised:
+                net.json('GET', 'https://graph.facebook.com/v26.0/me')
+        failure = raised.exception
+        self.assertEqual((failure.provider_code, failure.provider_subcode), (190, 463))
+        self.assertEqual(str(failure), 'HTTP_400')
+        self.assertNotIn('SIMULATED_PRIVATE', str(vars(failure)))
+
     def test_get_bounded_retry_and_no_sensitive_error_text(self):
         net = Transport(sleep=lambda _: None)
         net.opener = Opener(failures=10)

@@ -44,6 +44,7 @@ def parser():
     pub.add_argument('--now', action='store_true', help='Explicitly publish before its scheduled time')
     pub.add_argument('--force-republish', action='store_true', help='Explicitly republish an already published item')
     sub.choices['due'].add_argument('--dry-run', action='store_true')
+    sub.choices['validate'].add_argument('--live-account', action='store_true', help='只讀 Meta API 驗證專用帳號，不建立媒體或發布')
     reschedule = sub.add_parser('reschedule')
     reschedule.add_argument('content_id')
     reschedule.add_argument('publish_at', help='2026-10-01T20:00:00+08:00')
@@ -104,11 +105,18 @@ def run(args):
                 'production_ready': False if missing else 'RUN_LIVE_PREFLIGHT', 'paid_api_enabled': False}
     if command == 'validate':
         state, _ = journal().read()
-        return {'result': 'VALIDATION_PASS', 'brand': config['brand'], 'approval_mode': config['approval_mode'],
+        report = {'result': 'VALIDATION_PASS', 'brand': config['brand'], 'approval_mode': config['approval_mode'],
                 'auto_publish_without_approval': False, 'journal_access': 'PASS', 'paused': state['paused'],
                 'production_ready': state['production_ready'],
                 'secret_presence': {name: bool(os.environ.get(name)) for name in config['env'].values()},
                 'api_post_requests_sent': 0, 'note': '驗證設定與持久紀錄可讀；不代表 Meta 帳號已授權或已完成實物驗收。'}
+        if args.live_account:
+            report['live_account'] = MetaClient(config, credentials(config)).verify_account()
+            report['account_safety_gate'] = 'PASS'
+            report['namespaces'] = {'assets': config['hosting']['namespace'], 'content': 'content/' + config['brand'],
+                                    'publish_history': 'state/' + config['brand'] + '.json'}
+            report['note'] = '已用目前執行環境的專用 credentials 唯讀驗證真實 Page、IG、username 與 API access；實物、Hosting、文案 QA 與發布批准另行驗收。'
+        return report
     if command == 'secrets-sync':
         from .secret_setup import sync_secrets
         result = sync_secrets(config)

@@ -10,8 +10,10 @@ from .core import Blocked
 
 
 class ApiFailure(Blocked):
-    def __init__(self, code: str, http_status: int = 0, transient: bool = False):
+    def __init__(self, code: str, http_status: int = 0, transient: bool = False, provider_code=None, provider_subcode=None):
         self.http_status, self.transient = http_status, transient
+        self.provider_code = provider_code if type(provider_code) is int else None
+        self.provider_subcode = provider_subcode if type(provider_subcode) is int else None
         super().__init__(code, manual=http_status in (400, 401, 403))
 
 
@@ -50,9 +52,18 @@ class Transport:
             except urllib.error.HTTPError as error:
                 status = error.code
                 # Never expose provider error text; it may echo tokens, URLs, captions or headers.
-                error.close()
+                provider_code = provider_subcode = None
+                try:
+                    details = json.loads(error.read(65536)).get('error', {})
+                    if isinstance(details, dict):
+                        provider_code = details.get('code')
+                        provider_subcode = details.get('error_subcode')
+                except (ValueError, AttributeError, OSError):
+                    pass
+                finally:
+                    error.close()
                 transient = status in (408, 429, 500, 502, 503, 504)
-                failure = ApiFailure('HTTP_' + str(status), status, transient)
+                failure = ApiFailure('HTTP_' + str(status), status, transient, provider_code, provider_subcode)
             except (urllib.error.URLError, TimeoutError, OSError):
                 failure = ApiFailure('NETWORK_UNAVAILABLE', transient=True)
             if not failure.transient or attempt == attempts - 1:
@@ -99,6 +110,8 @@ class MetaClient:
             str(ig.get('id')) != target['instagram_user_id'] or
             str(ig.get('username', '')).casefold() != target['username'].casefold()):
             raise Blocked('LIVE_ACCOUNT_MISMATCH')
+        if self.config.get('expected_facebook_page_name') and page.get('name') != self.config['expected_facebook_page_name']:
+            raise Blocked('LIVE_FACEBOOK_PAGE_NAME_MISMATCH')
         limit = self.get(target['instagram_user_id'] + '/content_publishing_limit', 'config,quota_usage')
         if not limit.get('data'):
             raise Blocked('PUBLISH_PERMISSION_NOT_READABLE', manual=True)
@@ -107,7 +120,7 @@ class MetaClient:
             if cap is not None and entry.get('quota_usage', 0) >= cap:
                 raise Blocked('META_QUOTA_EXHAUSTED')
         return {'instagram_user_id': str(ig['id']), 'username': ig['username'],
-                'facebook_page_id': str(page['id']), 'api_access': True}
+                'facebook_page_id': str(page['id']), 'facebook_page_name': page.get('name'), 'api_access': True}
 
     def wait_container(self, creation_id: str):
         for _ in range(30):
@@ -122,4 +135,3 @@ class MetaClient:
 
     def recent_media(self):
         return self.get(self.creds['instagram_user_id'] + '/media', 'id,caption,media_type,media_url,permalink,timestamp', limit=100).get('data', [])
-

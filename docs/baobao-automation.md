@@ -2,6 +2,17 @@
 
 系統固定使用 `approval_mode=true`、`auto_publish_without_approval=false`。**提供照片、看 Preview、請我準備或先排好，都不等於批准發布。第一次測試也要你明確同意。**
 
+## 平常怎麼用
+
+1. **把照片給 Codex。**同一條素串的照片放在同一組，不同商品分清楚；有商品資料就附上，沒有也可以。
+2. **說「幫我處理這批寶寶礦照片」。**我會整理可存取的附件、逐條觀察實物、寫三版文案、QA、選封面與輪播順序。
+3. **等我交付 Preview。**內容停在 `READY_FOR_REVIEW`，讓你一次看整批。
+4. **不喜歡就指定修改。**例如「BB001 改短一點」或「這篇第二張和第四張交換」，只改該篇，再交給你審核。
+5. **你明確說「這幾篇可以發」。**只批准你指定的內容；第一篇測試也需說「這篇可以測試發」。
+6. **系統才安排或發布。**讀取你審核過的照片與文案，完成發布前檢查，成功後記錄 Media ID 並歸檔。
+
+若附件無法由工作區讀取，才會請你放到指定 inbox；不需要先研究下方技術細節。
+
 ## 平常我到底要怎麼用
 
 1. **照片放哪：**`content/baobao/inbox/`。
@@ -148,15 +159,15 @@ Preview 包含商品資料夾、Content ID、預計 target account、照片順�
 
 1. 開 [Graph API Explorer](https://developers.facebook.com/tools/explorer/)，選上面的既有 App。
 2. Get Token → Get User Access Token／Generate Access Token，以原 Facebook 身分登入。
-3. 在編輯資產存取權時加入「寶寶礦到了」Page 與它已連結的實際 IG，保留 maiocha。
+3. 在編輯先前設定／資產存取權時加入粉專「日常收藏所」與 Instagram `babycrystal.tw`，保留 maiocha。
 4. 授予 `pages_show_list`、`pages_read_engagement`、`instagram_basic`、`instagram_content_publish`，按 Continue／Allow。
 5. 複製 User Access Token，執行下面指令，在隱藏輸入中貼上；不要貼聊天。
 
 ```powershell
-.\tools\Connect-Baobao.ps1 -Username 寶寶礦的實際IG帳號
+.\tools\Connect-Baobao.ps1 -Username babycrystal.tw
 ```
 
-程式使用原 App Secret 換長效 token、驗證權限，從 Page→IG 找到確定 username、驗證 API，再存 `content/baobao/.env`。接著會以 GitHub repository public key 加密並直接設定這四個 Secrets：
+程式使用原 App Secret 換 token，驗證實際 App、User Token、permissions 與資產授權，再逐一核對 Page→IG→username。若粉專清單為空，會只依 Token 已授權的 Page ID 做直接 API 查核；不猜 ID，也不拿 maiocha 代用。成功後保存受保護的 `content/baobao/.env`，並以 GitHub repository public key 加密設定這四個 Secrets：
 
 ```
 BAOBAO_PAGE_ID
@@ -167,7 +178,11 @@ BAOBAO_PAGE_ACCESS_TOKEN
 
 如果只需重新同步已驗證 `.env`，執行 `baobao.cmd secrets-sync`。依據 [GitHub 官方 Secrets 加密流程](https://docs.github.com/en/rest/guides/encrypting-secrets-for-the-rest-api)，不輸出值、不送到聊天。Actions 的 `GITHUB_TOKEN` 由平台提供。
 
-GitHub PAT 權限目前已修正，可部署 workflows、操作 Actions 和 Secrets，不必再更新一次。尚無 baobao 授權時，不會填入 maiocha 的值頂替。
+GitHub PAT 權限目前已修正，可部署 workflows、操作 Actions 和 Secrets，不必再更新一次。
+
+隱藏輸入的 User Token 只以 Windows DPAPI 在 repository 外暫存；兩小時內可由 `Connect-Baobao.ps1 -Username babycrystal.tw -Resume` 安全續跑，成功後刪除暫存。Token 不出現在命令列、聊天、診斷或報告。安全診斷保存於 `.local/baobao-connect-result.json`。
+
+`baobao.cmd validate --live-account` 可唯讀核對實際帳號與品牌命名空間，不發布內容。GitHub Actions 的手動 Dry Run 也會使用 repository Secrets 做此檢查；排程執行仍由既有批准與 pause 閘門控制。
 
 ## 第一篇真實測試
 

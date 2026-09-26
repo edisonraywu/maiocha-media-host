@@ -138,3 +138,26 @@ class ReviewGateTests(unittest.TestCase):
         self.assertEqual(report['api_post_requests_sent'], 0)
         self.assertNotIn('fixture-not-a-real-token', str(report))
         self.assertTrue(all(value is True for value in report['secret_presence'].values()))
+
+    def test_live_account_validation_is_read_only_and_keeps_pause(self):
+        self.state.state['paused'] = True
+        meta = fixtures.FakeMeta()
+        args = parser().parse_args(['--repo', str(self.repo), '--workspace', str(self.root), 'validate', '--live-account'])
+        with patch('automation.cli.brand_config', return_value=self.config), \
+             patch('automation.cli.GitHubJournal', return_value=self.state), patch('automation.cli.MetaClient', return_value=meta):
+            report = run(args)
+        self.assertEqual(report['account_safety_gate'], 'PASS')
+        self.assertEqual(meta.verifications, 1)
+        self.assertEqual(meta.posts, [])
+        self.assertTrue(self.state.state['paused'])
+        self.assertEqual(report['namespaces']['assets'], 'media/baobao')
+        self.assertNotIn('fixture-not-a-real-token', str(report))
+
+    def test_live_account_validation_rejects_wrong_real_account(self):
+        meta = fixtures.FakeMeta(wrong=True)
+        args = parser().parse_args(['--repo', str(self.repo), '--workspace', str(self.root), 'validate', '--live-account'])
+        with patch('automation.cli.brand_config', return_value=self.config), \
+             patch('automation.cli.GitHubJournal', return_value=self.state), patch('automation.cli.MetaClient', return_value=meta):
+            with self.assertRaisesRegex(Blocked, 'LIVE_ACCOUNT_MISMATCH'):
+                run(args)
+        self.assertEqual(meta.posts, [])

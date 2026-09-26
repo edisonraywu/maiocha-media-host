@@ -36,9 +36,15 @@ jobs:
           cache-dependency-path: requirements-automation.txt
       - run: python -m pip install -r requirements-automation.txt
       - name: Validate isolated config, secret presence and durable pause without publishing
+        env:
+          LIVE_ACCOUNT_CHECK: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run }}
         run: |
           mkdir -p .local
-          python -m automation.cli --workspace .local validate > .local/config-validation.json
+          if [ "$LIVE_ACCOUNT_CHECK" = "true" ]; then
+            python -m automation.cli --workspace .local validate --live-account > .local/config-validation.json
+          else
+            python -m automation.cli --workspace .local validate > .local/config-validation.json
+          fi
       - name: Read due pre-generated content and publish with safety gates
         env:
           DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run }}
